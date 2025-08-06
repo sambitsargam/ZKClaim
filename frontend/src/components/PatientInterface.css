@@ -331,6 +331,67 @@
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
 }
 
+.auto-fetch-container {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.auto-fetch-container input {
+  flex: 1;
+}
+
+.auto-fetch-btn {
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.auto-fetch-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(59, 130, 246, 0.3);
+}
+
+.auto-fetch-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.auto-fetch-btn .spin {
+  animation: spin 1s linear infinite;
+}
+
+.success-message {
+  color: #10b981 !important;
+  font-weight: 600;
+}
+
+.error-message {
+  color: #ef4444 !important;
+  font-weight: 600;
+}
+
+.debug-info {
+  color: #6b7280 !important;
+  font-size: 0.75rem !important;
+  font-family: monospace !important;
+  background: rgba(107, 114, 128, 0.1);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  margin-top: 0.5rem !important;
+  display: block;
+}
+
 .permissions-section h3 {
   font-size: 1.2rem;
   font-weight: 700;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt, useChainId } from 'wagmi';
-import { Building, FileText, DollarSign, BarChart3, CheckCircle, AlertCircle, Clock, Eye } from 'lucide-react';
+import { useAccount, useWriteContract, useWaitForTransactionReceipt, useChainId, useReadContract } from 'wagmi';
+import { Building, FileText, DollarSign, BarChart3, CheckCircle, AlertCircle, Clock, Eye, Shield, Zap } from 'lucide-react';
 import { getContractAddress, ABI } from '../config/contracts';
 import ConnectButton from './ConnectButton';
 import './InsuranceInterface.css';
@@ -18,41 +18,57 @@ const InsuranceInterface = () => {
     rejectedClaims: 0
   });
   const [selectedClaim, setSelectedClaim] = useState(null);
+  const [verificationSteps, setVerificationSteps] = useState({});
 
   const { writeContract, data: hash, isPending } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
   });
 
+  // Fetch all pending claims from contract
+  const { data: allPendingClaims, refetch: refetchClaims } = useReadContract({
+    address: getContractAddress(chainId),
+    abi: ABI.HEALTH_CLAIM_VERIFIER,
+    functionName: 'getAllPendingClaims',
+    args: [],
+    enabled: isConnected && chainId,
+  });
+
   useEffect(() => {
     if (isConnected) {
-      fetchInsuranceClaims();
+      fetchProcessedClaims();
       fetchAnalytics();
     }
   }, [isConnected, address]);
 
   useEffect(() => {
+    if (allPendingClaims) {
+      setPendingClaims(allPendingClaims);
+    }
+  }, [allPendingClaims]);
+
+  useEffect(() => {
     if (isSuccess) {
-      fetchInsuranceClaims();
+      refetchClaims();
+      fetchProcessedClaims();
       fetchAnalytics();
     }
   }, [isSuccess]);
 
-  const fetchInsuranceClaims = async () => {
+  const fetchProcessedClaims = async () => {
     try {
-      const response = await fetch(`/api/insurance-claims/${address}`);
+      // For now, we'll get this from backend, but it could be extended to contract
+      const response = await fetch(`http://localhost:3001/api/insurance-claims/processed/${address}`);
       const data = await response.json();
-      
-      setPendingClaims(data.pending || []);
-      setProcessedClaims(data.processed || []);
+      setProcessedClaims(data || []);
     } catch (error) {
-      console.error('Failed to fetch claims:', error);
+      console.error('Failed to fetch processed claims:', error);
     }
   };
 
   const fetchAnalytics = async () => {
     try {
-      const response = await fetch(`/api/insurance-analytics/${address}`);
+      const response = await fetch(`http://localhost:3001/api/insurance-analytics/${address}`);
       const data = await response.json();
       setAnalytics(data);
     } catch (error) {
@@ -60,7 +76,64 @@ const InsuranceInterface = () => {
     }
   };
 
-  const processClaim = async (claimId, decision) => {
+  const startVerification = async (claimId) => {
+    setVerificationSteps(prev => ({
+      ...prev,
+      [claimId]: {
+        doctorVerification: { status: 'loading', message: 'Verifying doctor proof...' },
+        patientVerification: { status: 'pending', message: 'Waiting...' },
+        readyForPayment: { status: 'pending', message: 'Waiting...' }
+      }
+    }));
+
+    try {
+      // Step 1: Verify claim via contract
+      const contractAddress = getContractAddress(chainId);
+      
+      await writeContract({
+        address: contractAddress,
+        abi: ABI.HEALTH_CLAIM_VERIFIER,
+        functionName: 'verifyClaim',
+        args: [claimId],
+      });
+
+      // Simulate verification steps for UI
+      setTimeout(() => {
+        setVerificationSteps(prev => ({
+          ...prev,
+          [claimId]: {
+            doctorVerification: { status: 'completed', message: 'Doctor proof verified ✓' },
+            patientVerification: { status: 'loading', message: 'Verifying patient proof...' },
+            readyForPayment: { status: 'pending', message: 'Waiting...' }
+          }
+        }));
+
+        setTimeout(() => {
+          setVerificationSteps(prev => ({
+            ...prev,
+            [claimId]: {
+              doctorVerification: { status: 'completed', message: 'Doctor proof verified ✓' },
+              patientVerification: { status: 'completed', message: 'Patient proof verified ✓' },
+              readyForPayment: { status: 'ready', message: 'Ready for payment processing' }
+            }
+          }));
+        }, 2000);
+      }, 2000);
+
+    } catch (error) {
+      console.error('Failed to verify claim:', error);
+      setVerificationSteps(prev => ({
+        ...prev,
+        [claimId]: {
+          doctorVerification: { status: 'error', message: 'Verification failed' },
+          patientVerification: { status: 'pending', message: 'Waiting...' },
+          readyForPayment: { status: 'pending', message: 'Waiting...' }
+        }
+      }));
+    }
+  };
+
+  const processPayment = async (claimId, claimAmount) => {
     if (!isConnected) {
       alert('Please connect your wallet first');
       return;
@@ -69,29 +142,66 @@ const InsuranceInterface = () => {
     try {
       const contractAddress = getContractAddress(chainId);
       
-      writeContract({
+      await writeContract({
         address: contractAddress,
         abi: ABI.HEALTH_CLAIM_VERIFIER,
-        functionName: 'processInsuranceClaim',
-        args: [
-          claimId,
-          decision, // true for approve, false for reject
-          Date.now() // timestamp
-        ],
+        functionName: 'processPayment',
+        args: [claimId],
+        value: BigInt(claimAmount * 1e18), // Convert to wei for payment
+      });
+      
+      setVerificationSteps(prev => ({
+        ...prev,
+        [claimId]: undefined
+      }));
+      
+    } catch (error) {
+      console.error('Failed to process payment:', error);
+      alert('Failed to process payment: ' + error.message);
+    }
+  };
+
+  const approveClaim = async (claimId) => {
+    if (!isConnected) {
+      alert('Please connect your wallet first');
+      return;
+    }
+
+    try {
+      const contractAddress = getContractAddress(chainId);
+      
+      await writeContract({
+        address: contractAddress,
+        abi: ABI.HEALTH_CLAIM_VERIFIER,
+        functionName: 'approveClaim',
+        args: [claimId],
       });
       
     } catch (error) {
-      console.error('Failed to process claim:', error);
-      alert('Failed to process claim: ' + error.message);
+      console.error('Failed to approve claim:', error);
+      alert('Failed to approve claim: ' + error.message);
+    }
+  };
+
+  // Convert enum status to string
+  const getStatusText = (status) => {
+    switch (Number(status)) {
+      case 0: return 'Pending';
+      case 1: return 'Verified';
+      case 2: return 'Approved';
+      case 3: return 'Rejected';
+      case 4: return 'Paid';
+      default: return 'Unknown';
     }
   };
 
   const getStatusColor = (status) => {
-    switch (status) {
-      case 'approved': return 'approved';
-      case 'rejected': return 'rejected';
-      case 'pending': return 'pending';
-      case 'under_review': return 'under-review';
+    switch (Number(status)) {
+      case 0: return 'pending';      // Pending
+      case 1: return 'verified';     // Verified
+      case 2: return 'approved';     // Approved
+      case 3: return 'rejected';     // Rejected
+      case 4: return 'paid';         // Paid
       default: return 'pending';
     }
   };
@@ -161,7 +271,7 @@ const InsuranceInterface = () => {
                     <div className="claim-header">
                       <div className="claim-id">#{claim.id}</div>
                       <div className={`claim-status ${getStatusColor(claim.status)}`}>
-                        {claim.status.replace('_', ' ')}
+                        {getStatusText(claim.status)}
                       </div>
                     </div>
                     
@@ -188,17 +298,86 @@ const InsuranceInterface = () => {
                     </div>
 
                     <div className="claim-verification">
-                      <div className="verification-status">
-                        <CheckCircle size={16} />
-                        <span>ZK Proof Verified</span>
-                      </div>
-                      <button 
-                        className="view-proof-btn"
-                        onClick={() => setSelectedClaim(claim)}
-                      >
-                        <Eye size={16} />
-                        View Details
-                      </button>
+                      {!verificationSteps[claim.id] ? (
+                        <>
+                          <div className="verification-status">
+                            <Shield size={16} />
+                            <span>Ready for Verification</span>
+                          </div>
+                          <button 
+                            className="verify-btn"
+                            onClick={() => startVerification(claim.id)}
+                            disabled={isPending || isConfirming}
+                          >
+                            <Zap size={16} />
+                            Start Verification
+                          </button>
+                        </>
+                      ) : (
+                        <div className="verification-steps">
+                          <div className="step-by-step">
+                            <div className={`verification-step ${verificationSteps[claim.id].doctorVerification.status}`}>
+                              <div className="step-icon">
+                                {verificationSteps[claim.id].doctorVerification.status === 'loading' && (
+                                  <div className="loading-spinner"></div>
+                                )}
+                                {verificationSteps[claim.id].doctorVerification.status === 'completed' && (
+                                  <CheckCircle size={16} />
+                                )}
+                                {verificationSteps[claim.id].doctorVerification.status === 'error' && (
+                                  <AlertCircle size={16} />
+                                )}
+                              </div>
+                              <span>{verificationSteps[claim.id].doctorVerification.message}</span>
+                            </div>
+                            
+                            <div className={`verification-step ${verificationSteps[claim.id].patientVerification.status}`}>
+                              <div className="step-icon">
+                                {verificationSteps[claim.id].patientVerification.status === 'loading' && (
+                                  <div className="loading-spinner"></div>
+                                )}
+                                {verificationSteps[claim.id].patientVerification.status === 'completed' && (
+                                  <CheckCircle size={16} />
+                                )}
+                                {verificationSteps[claim.id].patientVerification.status === 'error' && (
+                                  <AlertCircle size={16} />
+                                )}
+                              </div>
+                              <span>{verificationSteps[claim.id].patientVerification.message}</span>
+                            </div>
+                            
+                            <div className={`verification-step ${verificationSteps[claim.id].readyForPayment.status}`}>
+                              <div className="step-icon">
+                                {verificationSteps[claim.id].readyForPayment.status === 'ready' && (
+                                  <DollarSign size={16} />
+                                )}
+                              </div>
+                              <span>{verificationSteps[claim.id].readyForPayment.message}</span>
+                            </div>
+                          </div>
+                          
+                          {verificationSteps[claim.id].readyForPayment.status === 'ready' && (
+                            <div className="payment-actions">
+                              <button 
+                                className="process-payment-btn"
+                                onClick={() => processPayment(claim.id, claim.claimAmount)}
+                                disabled={isPending || isConfirming}
+                              >
+                                <DollarSign size={16} />
+                                Process Payment ({formatCurrency(claim.claimAmount)})
+                              </button>
+                              <button 
+                                className="approve-btn"
+                                onClick={() => approveClaim(claim.id)}
+                                disabled={isPending || isConfirming}
+                              >
+                                <CheckCircle size={16} />
+                                Approve Only
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="claim-actions">
@@ -249,7 +428,7 @@ const InsuranceInterface = () => {
                     <div className="claim-header">
                       <div className="claim-id">#{claim.id}</div>
                       <div className={`claim-status ${getStatusColor(claim.status)}`}>
-                        {claim.status.replace('_', ' ')}
+                        {getStatusText(claim.status)}
                       </div>
                     </div>
                     

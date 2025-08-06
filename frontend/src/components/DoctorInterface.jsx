@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt, useChainId } from 'wagmi';
-import { Stethoscope, FileText, Shield, User, Clock, CheckCircle, AlertCircle, Upload } from 'lucide-react';
+import { useAccount, useWriteContract, useWaitForTransactionReceipt, useChainId, useReadContract } from 'wagmi';
+import { Stethoscope, FileText, User, Clock, Shield, CheckCircle, AlertCircle, Upload } from 'lucide-react';
 import { getContractAddress, ABI } from '../config/contracts';
 import ConnectButton from './ConnectButton';
+import './DoctorInterface.css';
 import './DoctorInterface.css';
 
 const DoctorInterface = () => {
@@ -30,23 +31,28 @@ const DoctorInterface = () => {
     hash,
   });
 
+  // Fetch doctor claims from contract
+  const { data: doctorClaims, refetch: refetchDoctorClaims } = useReadContract({
+    address: getContractAddress(chainId),
+    abi: ABI.HEALTH_CLAIM_VERIFIER,
+    functionName: 'getDoctorClaims',
+    args: [address],
+    enabled: isConnected && chainId && address,
+  });
+
   useEffect(() => {
     if (isSuccess) {
       // Refresh claims after successful transaction
-      fetchDoctorClaims();
+      refetchDoctorClaims();
     }
   }, [isSuccess]);
 
-  const fetchDoctorClaims = async () => {
-    try {
-      // This would fetch from your backend API
-      const response = await fetch(`http://localhost:3001/api/doctor-claims/${address}`);
-      const claims = await response.json();
-      setClaimSubmissions(claims);
-    } catch (error) {
-      console.error('Failed to fetch claims:', error);
+  // Update claimSubmissions when doctorClaims data changes
+  useEffect(() => {
+    if (doctorClaims) {
+      setClaimSubmissions(doctorClaims);
     }
-  };
+  }, [doctorClaims]);
 
   const generateDoctorProof = async () => {
     setProofGeneration({ loading: true, step: 'Generating ZK proof...', proof: null });
@@ -93,23 +99,25 @@ const DoctorInterface = () => {
       return;
     }
 
+    if (!patientData.patientAddress) {
+      alert('Please enter the patient wallet address');
+      return;
+    }
+
     try {
       const proof = await generateDoctorProof();
       
       // Get contract address for current chain
       const contractAddress = getContractAddress(chainId);
       
-      // Submit to smart contract
+      // Submit proof hash and patient address to contract
       writeContract({
         address: contractAddress,
         abi: ABI.HEALTH_CLAIM_VERIFIER,
         functionName: 'submitDoctorClaim',
         args: [
-          patientData.patientAddress,
-          patientData.procedure_code,
-          patientData.treatmentCost,
-          proof.proofHash, // Use the proof hash from zkVerify
-          proof.txHash     // Include the transaction hash as well
+          proof.proofHash,           // Proof hash
+          patientData.patientAddress  // Patient wallet address
         ],
       });
       
@@ -296,7 +304,7 @@ const DoctorInterface = () => {
             </div>
 
             <div className="claims-list">
-              {claimSubmissions.length === 0 ? (
+              {!claimSubmissions || claimSubmissions.length === 0 ? (
                 <div className="empty-state">
                   <FileText size={48} />
                   <h3>No claims submitted yet</h3>
@@ -306,23 +314,23 @@ const DoctorInterface = () => {
                 claimSubmissions.map((claim, index) => (
                   <div key={index} className="claim-card">
                     <div className="claim-header">
-                      <div className="claim-id">#{claim.id}</div>
-                      <div className={`claim-status ${claim.status}`}>
-                        {claim.status.replace('_', ' ')}
+                      <div className="claim-id">#{index + 1}</div>
+                      <div className={`claim-status ${claim.isActive ? 'active' : 'inactive'}`}>
+                        {claim.isActive ? 'Active' : 'Inactive'}
                       </div>
                     </div>
                     <div className="claim-details">
                       <div className="claim-info">
+                        <strong>Doctor:</strong> {claim.doctorAddress?.slice(0, 6)}...{claim.doctorAddress?.slice(-4)}
+                      </div>
+                      <div className="claim-info">
                         <strong>Patient:</strong> {claim.patientAddress?.slice(0, 6)}...{claim.patientAddress?.slice(-4)}
                       </div>
                       <div className="claim-info">
-                        <strong>Procedure Code:</strong> {claim.procedure_code}
+                        <strong>Proof Hash:</strong> {claim.proofHash?.slice(0, 10)}...{claim.proofHash?.slice(-10)}
                       </div>
                       <div className="claim-info">
-                        <strong>Amount:</strong> ${claim.amount}
-                      </div>
-                      <div className="claim-info">
-                        <strong>Date:</strong> {new Date(claim.timestamp).toLocaleDateString()}
+                        <strong>Status:</strong> {claim.isActive ? 'Active' : 'Inactive'}
                       </div>
                     </div>
                   </div>

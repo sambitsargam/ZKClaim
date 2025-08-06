@@ -1,44 +1,78 @@
 [
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_settlement",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "nonpayable",
-    "type": "constructor"
+    "inputs": [],
+    "name": "totalClaims",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
   },
   {
     "inputs": [
-      {
-        "internalType": "bytes32",
-        "name": "root",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "bytes32[]",
-        "name": "path",
-        "type": "bytes32[]"
-      },
-      {
-        "internalType": "uint256",
-        "name": "index",
-        "type": "uint256"
-      },
-      {
-        "internalType": "bytes",
-        "name": "leaf",
-        "type": "bytes"
-      }
+      {"internalType": "string", "name": "proofHash", "type": "string"},
+      {"internalType": "address", "name": "patientAddress", "type": "address"}
     ],
-    "name": "approve",
+    "name": "submitDoctorClaim",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "address", "name": "doctorAddress", "type": "address"},
+      {"internalType": "string", "name": "doctorProofHash", "type": "string"},
+      {"internalType": "string", "name": "patientProofHash", "type": "string"},
+      {"internalType": "uint256", "name": "claimAmount", "type": "uint256"}
+    ],
+    "name": "submitPatientClaim",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "uint256", "name": "claimId", "type": "uint256"},
+      {"internalType": "bool", "name": "doctorVerified", "type": "bool"},
+      {"internalType": "bool", "name": "patientVerified", "type": "bool"}
+    ],
+    "name": "verifyClaim",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "uint256", "name": "claimId", "type": "uint256"}
+    ],
+    "name": "approveClaim",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "uint256", "name": "claimId", "type": "uint256"}
+    ],
+    "name": "processPayment",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "address", "name": "doctor", "type": "address"}
+    ],
+    "name": "getDoctorClaims",
     "outputs": [
       {
-        "internalType": "bool",
+        "components": [
+          {"internalType": "address", "name": "doctorAddress", "type": "address"},
+          {"internalType": "address", "name": "patientAddress", "type": "address"},
+          {"internalType": "string", "name": "proofHash", "type": "string"},
+          {"internalType": "bool", "name": "isActive", "type": "bool"}
+        ],
+        "internalType": "struct HealthClaimVerifier.DoctorClaim[]",
         "name": "",
-        "type": "bool"
+        "type": "tuple[]"
       }
     ],
     "stateMutability": "view",
@@ -46,15 +80,102 @@
   },
   {
     "inputs": [],
-    "name": "settlement",
+    "name": "getAllPendingClaims",
     "outputs": [
       {
-        "internalType": "contract IZkVerifySettlement",
+        "components": [
+          {"internalType": "address", "name": "patientAddress", "type": "address"},
+          {"internalType": "address", "name": "doctorAddress", "type": "address"},
+          {"internalType": "string", "name": "doctorProofHash", "type": "string"},
+          {"internalType": "string", "name": "patientProofHash", "type": "string"},
+          {"internalType": "uint256", "name": "claimAmount", "type": "uint256"},
+          {"internalType": "uint8", "name": "status", "type": "uint8"}
+        ],
+        "internalType": "struct HealthClaimVerifier.PatientClaim[]",
         "name": "",
-        "type": "address"
+        "type": "tuple[]"
       }
     ],
     "stateMutability": "view",
     "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getLatestDoctorProofHash",
+    "outputs": [{"internalType": "string", "name": "", "type": "string"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "address", "name": "patientAddress", "type": "address"}
+    ],
+    "name": "getDoctorProofHashForPatient",
+    "outputs": [{"internalType": "string", "name": "", "type": "string"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getTotalDoctors",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getAllDoctorAddresses",
+    "outputs": [{"internalType": "address[]", "name": "", "type": "address[]"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "address", "name": "doctor", "type": "address"},
+      {"indexed": false, "internalType": "string", "name": "proofHash", "type": "string"}
+    ],
+    "name": "DoctorClaimSubmitted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "address", "name": "patient", "type": "address"},
+      {"indexed": true, "internalType": "address", "name": "doctor", "type": "address"},
+      {"indexed": false, "internalType": "string", "name": "patientProofHash", "type": "string"},
+      {"indexed": false, "internalType": "uint256", "name": "claimAmount", "type": "uint256"}
+    ],
+    "name": "PatientClaimSubmitted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "uint256", "name": "claimId", "type": "uint256"},
+      {"indexed": false, "internalType": "bool", "name": "doctorVerified", "type": "bool"},
+      {"indexed": false, "internalType": "bool", "name": "patientVerified", "type": "bool"}
+    ],
+    "name": "ClaimVerified",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "uint256", "name": "claimId", "type": "uint256"},
+      {"indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256"}
+    ],
+    "name": "ClaimApproved",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "uint256", "name": "claimId", "type": "uint256"},
+      {"indexed": true, "internalType": "address", "name": "patient", "type": "address"},
+      {"indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256"}
+    ],
+    "name": "PaymentProcessed",
+    "type": "event"
   }
 ]

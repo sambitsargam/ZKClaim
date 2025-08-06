@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt, useChainId } from 'wagmi';
-import { User, FileText, Shield, Clock, CheckCircle, AlertCircle, Eye, Download } from 'lucide-react';
+import { useAccount, useWriteContract, useWaitForTransactionReceipt, useChainId, useReadContract } from 'wagmi';
+import { User, FileText, Shield, Clock, CheckCircle, AlertCircle, Eye, Download, RefreshCw } from 'lucide-react';
 import { getContractAddress, ABI } from '../config/contracts';
 import ConnectButton from './ConnectButton';
 import './PatientInterface.css';
@@ -15,6 +15,11 @@ const PatientInterface = () => {
     patient_id: '',
     policy_limit: '',
     claim_amount: ''
+  });
+  const [autoFetchStatus, setAutoFetchStatus] = useState({
+    loading: false,
+    success: false,
+    error: null
   });
   const [consent, setConsent] = useState({
     doctorAddress: '',
@@ -35,6 +40,33 @@ const PatientInterface = () => {
     hash,
   });
 
+  // Auto-fetch the doctor proof hash specifically for this patient
+  const { data: patientSpecificProofHash, refetch: refetchPatientProofHash } = useReadContract({
+    address: getContractAddress(chainId),
+    abi: ABI.HEALTH_CLAIM_VERIFIER,
+    functionName: 'getDoctorProofHashForPatient',
+    args: [address],
+    enabled: isConnected && chainId && address,
+  });
+
+  // Also keep the general latest doctor proof as fallback
+  const { data: latestDoctorProofHash, refetch: refetchDoctorProofHash } = useReadContract({
+    address: getContractAddress(chainId),
+    abi: ABI.HEALTH_CLAIM_VERIFIER,
+    functionName: 'getLatestDoctorProofHash',
+    args: [],
+    enabled: isConnected && chainId,
+  });
+
+  // Debug: Get total doctors to check if any doctor has submitted
+  const { data: totalDoctors } = useReadContract({
+    address: getContractAddress(chainId),
+    abi: ABI.HEALTH_CLAIM_VERIFIER,
+    functionName: 'getTotalDoctors',
+    args: [],
+    enabled: isConnected && chainId,
+  });
+
   useEffect(() => {
     if (isConnected) {
       fetchPatientClaims();
@@ -46,6 +78,74 @@ const PatientInterface = () => {
       fetchPatientClaims();
     }
   }, [isSuccess]);
+
+  // Auto-populate doctor proof hash when available (prioritize patient-specific)
+  useEffect(() => {
+    const proofHash = patientSpecificProofHash || latestDoctorProofHash;
+    
+    if (proofHash && 
+        proofHash !== '0x' && 
+        proofHash !== '' && 
+        proofHash.length > 0) {
+      setClaimData(prev => ({
+        ...prev,
+        doctor_proof_hash: proofHash
+      }));
+      setAutoFetchStatus({
+        loading: false,
+        success: true,
+        error: null
+      });
+    }
+  }, [patientSpecificProofHash, latestDoctorProofHash]);
+
+  const fetchLatestDoctorProofHash = async () => {
+    if (!isConnected) return;
+    
+    setAutoFetchStatus({ loading: true, success: false, error: null });
+    
+    try {
+      // First try to get patient-specific proof hash
+      const patientResult = await refetchPatientProofHash();
+      let proofHash = patientResult.data;
+      let isPatientSpecific = true;
+      
+      // If no patient-specific proof, try general latest proof
+      if (!proofHash || proofHash === '0x' || proofHash === '' || proofHash.length === 0) {
+        const generalResult = await refetchDoctorProofHash();
+        proofHash = generalResult.data;
+        isPatientSpecific = false;
+      }
+      
+      if (proofHash && 
+          proofHash !== '0x' && 
+          proofHash !== '' && 
+          proofHash.length > 0) {
+        setClaimData(prev => ({
+          ...prev,
+          doctor_proof_hash: proofHash
+        }));
+        setAutoFetchStatus({
+          loading: false,
+          success: true,
+          error: null
+        });
+      } else {
+        setAutoFetchStatus({
+          loading: false,
+          success: false,
+          error: `No doctor proof found${isPatientSpecific ? ' for your address' : ''}. Total doctors in system: ${totalDoctors || 0}. Please ensure a doctor has submitted a proof${isPatientSpecific ? ' for you' : ''} first.`
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch doctor proof hash:', error);
+      setAutoFetchStatus({
+        loading: false,
+        success: false,
+        error: `Failed to fetch doctor proof hash: ${error.message}`
+      });
+    }
+  };
 
   const fetchPatientClaims = async () => {
     try {
@@ -108,24 +208,37 @@ const PatientInterface = () => {
       return;
     }
 
+    if (!claimData.doctor_proof_hash) {
+      alert('Please fetch the doctor proof hash first');
+      return;
+    }
+
     try {
       const proof = await generatePatientProof(claimData);
       
       const contractAddress = getContractAddress(chainId);
       
+      // Submit with simplified parameters (ZK principle - minimal on-chain data)
       writeContract({
         address: contractAddress,
         abi: ABI.HEALTH_CLAIM_VERIFIER,
         functionName: 'submitPatientClaim',
         args: [
+          address, // doctor address (will need to be updated to actual doctor address)
           claimData.doctor_proof_hash,
-          claimData.patient_id,
-          claimData.policy_limit,
-          claimData.claim_amount,
-          proof.proofHash, // Use the proof hash from zkVerify
-          proof.txHash     // Include the transaction hash as well
+          proof.proofHash, // patient proof hash
+          parseInt(claimData.claim_amount)
         ],
       });
+      
+      // Clear form after successful submission
+      setClaimData({
+        doctor_proof_hash: '',
+        patient_id: '',
+        policy_limit: '',
+        claim_amount: ''
+      });
+      setProofGeneration({ loading: false, step: '', proof: null });
       
     } catch (error) {
       console.error('Failed to submit claim:', error);
@@ -207,12 +320,25 @@ const PatientInterface = () => {
     }
   };
 
+  // Convert enum status to string
+  const getStatusText = (status) => {
+    switch (Number(status)) {
+      case 0: return 'Pending';
+      case 1: return 'Verified';
+      case 2: return 'Approved';
+      case 3: return 'Rejected';
+      case 4: return 'Paid';
+      default: return 'Unknown';
+    }
+  };
+
   const getStatusColor = (status) => {
-    switch (status) {
-      case 'approved': return 'approved';
-      case 'pending': return 'pending';
-      case 'under_review': return 'under-review';
-      case 'rejected': return 'rejected';
+    switch (Number(status)) {
+      case 0: return 'pending';      // Pending
+      case 1: return 'verified';     // Verified
+      case 2: return 'approved';     // Approved
+      case 3: return 'rejected';     // Rejected
+      case 4: return 'paid';         // Paid
       default: return 'pending';
     }
   };
@@ -266,13 +392,39 @@ const PatientInterface = () => {
             <div className="claim-form">
               <div className="form-group">
                 <label>Doctor Proof Hash</label>
-                <input
-                  type="text"
-                  placeholder="Hash from doctor's ZK proof"
-                  value={claimData.doctor_proof_hash}
-                  onChange={(e) => handleClaimInputChange('doctor_proof_hash', e.target.value)}
-                />
-                <small>This hash is provided by your doctor after they generate their proof</small>
+                <div className="auto-fetch-container">
+                  <input
+                    type="text"
+                    placeholder="Hash from doctor's ZK proof"
+                    value={claimData.doctor_proof_hash}
+                    onChange={(e) => handleClaimInputChange('doctor_proof_hash', e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="auto-fetch-btn"
+                    onClick={fetchLatestDoctorProofHash}
+                    disabled={autoFetchStatus.loading || !isConnected}
+                  >
+                    <RefreshCw size={16} className={autoFetchStatus.loading ? 'spin' : ''} />
+                    Auto-Fetch
+                  </button>
+                </div>
+                {autoFetchStatus.success && (
+                  <small className="success-message">✓ Latest doctor proof hash automatically fetched</small>
+                )}
+                {autoFetchStatus.error && (
+                  <small className="error-message">{autoFetchStatus.error}</small>
+                )}
+                {!autoFetchStatus.success && !autoFetchStatus.error && (
+                  <small>Click "Auto-Fetch" to automatically get the latest doctor proof hash</small>
+                )}
+                {process.env.NODE_ENV === 'development' && (
+                  <small className="debug-info">
+                    Debug: Chain {chainId}, Doctors: {totalDoctors || 0}<br/>
+                    Patient-specific: {patientSpecificProofHash || 'none'}<br/>
+                    Latest general: {latestDoctorProofHash || 'none'}
+                  </small>
+                )}
               </div>
 
               <div className="form-group">
@@ -352,7 +504,7 @@ const PatientInterface = () => {
                     <div className="claim-header">
                       <div className="claim-id">#{claim.id}</div>
                       <div className={`claim-status ${getStatusColor(claim.status)}`}>
-                        {claim.status.replace('_', ' ')}
+                        {getStatusText(claim.status)}
                       </div>
                     </div>
                     
