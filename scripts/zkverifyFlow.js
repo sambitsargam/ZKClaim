@@ -7,7 +7,7 @@ import path from "path";
 import dotenv from "dotenv";
 dotenv.config();
 
-const { RELAYER_API, RELAYER_KEY } = process.env;
+const { RELAYER_API, RELAYER_KEY, CHAIN_ID } = process.env;
 if (!RELAYER_API || !RELAYER_KEY) {
   throw new Error("Missing RELAYER_API or RELAYER_KEY in .env");
 }
@@ -55,6 +55,10 @@ async function registerVK(role) {
 // Helper: poll until the relayer finalizes a job
 async function awaitFinal(jobId) {
   console.log(`Polling job status for job ID: ${jobId}`);
+  const isAggregationEnabled = CHAIN_ID && parseInt(CHAIN_ID);
+  const targetStatus = isAggregationEnabled ? "Aggregated" : "Finalized";
+  
+  console.log(`${isAggregationEnabled ? '🔗 Aggregation enabled' : '⚡ Direct verification'} - Waiting for status: ${targetStatus}`);
   
   while (true) {
     try {
@@ -64,16 +68,21 @@ async function awaitFinal(jobId) {
       const { status } = res.data;
       console.log(`Job ${jobId} status: ${status}`);
       
-      if (status === "Finalized") {
-        console.log("Job finalized successfully");
+      if (status === targetStatus) {
+        console.log(`Job ${targetStatus.toLowerCase()} successfully`);
+        if (isAggregationEnabled && status === "Aggregated") {
+          console.log("📊 Aggregation details:", res.data.aggregationDetails);
+          console.log("🔗 Aggregation ID:", res.data.aggregationId);
+        }
         return res.data;
       }
       if (status === "Failed") {
         throw new Error(`Job ${jobId} failed: ${JSON.stringify(res.data)}`);
       }
       
-      // Wait for 5 seconds before next poll
-      await new Promise(r => setTimeout(r, 5000));
+      // Wait longer for aggregation process
+      const waitTime = isAggregationEnabled ? 20000 : 5000;
+      await new Promise(r => setTimeout(r, waitTime));
     } catch (error) {
       if (error.response && error.response.status === 503) {
         console.log("Service Unavailable, retrying...");
@@ -112,6 +121,12 @@ export async function doctorFlow(doctorInput) {
     }
   };
 
+  // Add chainId for aggregation if provided
+  if (CHAIN_ID && parseInt(CHAIN_ID)) {
+    params.chainId = parseInt(CHAIN_ID);
+    console.log(`🔗 Aggregation enabled for chain ID: ${CHAIN_ID}`);
+  }
+
   const submitRes = await axios.post(
     `${RELAYER_API}/submit-proof/${RELAYER_KEY}`,
     params
@@ -126,12 +141,22 @@ export async function doctorFlow(doctorInput) {
   const jobId = submitRes.data.jobId;
   const final = await awaitFinal(jobId);
   
-  // publicSignals[0] is our proof_hash
-  return { 
+  // Return appropriate data based on aggregation status
+  const result = { 
     proofHash: publicSignals[0],
     txHash: final.txHash,
-    blockHash: final.blockHash
+    blockHash: final.blockHash,
+    jobId: jobId,
+    status: final.status
   };
+
+  // Add aggregation data if available
+  if (final.aggregationDetails) {
+    result.aggregationDetails = final.aggregationDetails;
+    result.aggregationId = final.aggregationId;
+  }
+
+  return result;
 }
 
 // Generate & submit Patient proof (requires doctorProofHash)
@@ -161,6 +186,12 @@ export async function patientFlow(patientInput) {
     }
   };
 
+  // Add chainId for aggregation if provided
+  if (CHAIN_ID && parseInt(CHAIN_ID)) {
+    params.chainId = parseInt(CHAIN_ID);
+    console.log(`🔗 Aggregation enabled for chain ID: ${CHAIN_ID}`);
+  }
+
   const submitRes = await axios.post(
     `${RELAYER_API}/submit-proof/${RELAYER_KEY}`,
     params
@@ -176,11 +207,37 @@ export async function patientFlow(patientInput) {
   const final = await awaitFinal(jobId);
   
   // Return verification details
-  return {
+  const result = {
     proofHash: publicSignals[0],
     txHash: final.txHash,
     blockHash: final.blockHash,
     jobId: jobId,
     status: final.status
   };
+
+  // Add aggregation data if available
+  if (final.aggregationDetails) {
+    result.aggregationDetails = final.aggregationDetails;
+    result.aggregationId = final.aggregationId;
+    
+    // Save aggregation data to file for future reference
+    const aggregationData = {
+      ...final.aggregationDetails,
+      aggregationId: final.aggregationId,
+      proofHash: publicSignals[0],
+      timestamp: new Date().toISOString()
+    };
+    
+    try {
+      fs.writeFileSync(
+        path.join("build", "patient", "aggregation_data.json"),
+        JSON.stringify(aggregationData, null, 2)
+      );
+      console.log("💾 Aggregation data saved to build/patient/aggregation_data.json");
+    } catch (error) {
+      console.warn("⚠️ Could not save aggregation data:", error.message);
+    }
+  }
+
+  return result;
 }

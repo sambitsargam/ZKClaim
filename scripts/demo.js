@@ -4,7 +4,15 @@ import { doctorFlow, patientFlow } from './zkverifyFlow.js';
 
 async function runDemo() {
   try {
+    const isAggregationEnabled = process.env.CHAIN_ID && parseInt(process.env.CHAIN_ID);
+    
     console.log("🏥 Starting ZKClaim Demo\n");
+    if (isAggregationEnabled) {
+      console.log(`🔗 Aggregation Mode: Enabled (Chain ID: ${process.env.CHAIN_ID})`);
+      console.log("📊 Proofs will be aggregated and published to connected chain\n");
+    } else {
+      console.log("⚡ Direct Mode: Proofs will be verified directly on zkVerify\n");
+    }
 
     // Doctor inputs
     const doctorInput = {
@@ -35,6 +43,22 @@ async function runDemo() {
     console.log("\n🎉 ZKClaim Demo completed successfully!");
     console.log(`🔗 Doctor tx: https://zkverify-testnet.subscan.io/extrinsic/${doctorResult.txHash}`);
     console.log(`🔗 Patient tx: https://zkverify-testnet.subscan.io/extrinsic/${patientResult.txHash}`);
+    
+    if (isAggregationEnabled) {
+      console.log("\n📊 Aggregation Information:");
+      if (doctorResult.aggregationId) {
+        console.log(`🔗 Doctor Aggregation ID: ${doctorResult.aggregationId}`);
+      }
+      if (patientResult.aggregationId) {
+        console.log(`🔗 Patient Aggregation ID: ${patientResult.aggregationId}`);
+        console.log("💾 Aggregation data saved to build/patient/aggregation_data.json");
+      }
+      
+      const chainName = process.env.CHAIN_ID === "11155111" ? "Sepolia" : 
+                       process.env.CHAIN_ID === "84532" ? "Base Sepolia" : 
+                       `Chain ${process.env.CHAIN_ID}`;
+      console.log(`🌐 Proofs will be published to ${chainName} testnet`);
+    }
 
   } catch (error) {
     console.error("❌ Demo failed:", error.message);
@@ -48,17 +72,27 @@ async function runDemo() {
 // Handle command line arguments
 if (process.argv.includes('--help') || process.argv.includes('-h')) {
   console.log(`
-ZKClaim Demo Script
+ZKClaim Demo Script with Aggregation Support
 
 Usage: npm run demo
 
 Environment Variables Required:
   RELAYER_API - zkVerify relayer API URL
   RELAYER_KEY - Your API key from Horizen Labs
+  CHAIN_ID    - Optional: Chain ID for aggregation (11155111=Sepolia, 84532=Base Sepolia)
 
 Example .env file:
   RELAYER_API=https://relayer-api.horizenlabs.io/api/v1
   RELAYER_KEY=your_api_key_here
+  CHAIN_ID=11155111  # Optional: Enable aggregation to Sepolia
+
+Aggregation vs Direct Mode:
+  - With CHAIN_ID: Proofs are aggregated and published to connected chains (Sepolia, Base Sepolia)
+  - Without CHAIN_ID: Proofs are verified directly on zkVerify (faster, no aggregation)
+
+Supported Chain IDs:
+  11155111 - Ethereum Sepolia Testnet
+  84532    - Base Sepolia Testnet
 
 Note: You need to obtain an API key from the Horizen Labs team
 or contact them on Discord: https://discord.gg/zkverify

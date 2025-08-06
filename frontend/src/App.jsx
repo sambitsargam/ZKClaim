@@ -1,69 +1,228 @@
-import { useState, useEffect } from "react";
-import { ethers } from "ethers";
-import HealthClaimVerifierABI from "./abis/HealthClaimVerifier.json";
-
-const VERIFIER = "0x7EF74176B51b13e8753C1Ca5055da870a5EC63f2";
+import React, { useState, useEffect } from 'react';
+import { Shield, Zap, Eye, CheckCircle, ArrowRight, Github, Twitter, Linkedin } from 'lucide-react';
+import './App.css';
 
 function App() {
-  const [provider, setProvider] = useState(null);
-  const [contract, setContract] = useState(null);
-  const [doctorInput, setDoctorInput] = useState(null);
-  const [patientInput, setPatientInput] = useState(null);
-  const [aggData, setAggData] = useState(null);
+  const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    if (window.ethereum) {
-      const p = new ethers.BrowserProvider(window.ethereum);
-      setProvider(p);
-      p.send("eth_requestAccounts", []).then(() => {
-        const signer = p.getSigner();
-        setContract(new ethers.Contract(VERIFIER, HealthClaimVerifierABI, signer));
-      });
-    } else {
-      alert("Please install MetaMask");
-    }
+    setIsVisible(true);
   }, []);
 
-  const genDoctor = () => {
-    const input = {
-      procedure_code: 1001,
-      doctor_id: Date.now() % 1e9,
-      date: Number(new Date().toISOString().slice(0,10).replace(/-/g,""))
-    };
-    setDoctorInput(input);
-    alert("Doctor input generated");
-  };
-
-  const doSubmit = async () => {
-    if (!doctorInput) { alert("Generate doctor input first"); return; }
-    const patInp = {
-      patient_id: Math.floor(Math.random()*1e9),
-      policy_limit: 500000,
-      claim_amount: 450000
-    };
-    setPatientInput(patInp);
-    const res = await fetch("http://localhost:3000/api/submit-claims", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ doctorInput, patientInput: patInp })
-    });
-    const data = await res.json();
-    setAggData(data);
-    alert("Proofs submitted and finalized");
-  };
-
-  const approve = async () => {
-    if (!aggData) { alert("Submit proofs first"); return; }
-    const tx = await contract.approve(aggData.root, aggData.path, aggData.index, aggData.leaf);
-    await tx.wait();
-    alert("Claim approved: " + tx.hash);
-  };
-
   return (
-    <div style={{ padding: 20 }}>
-      <button onClick={genDoctor}>1. Generate Doctor Input</button>
-      <button onClick={doSubmit}>2. Submit Proofs to zkVerify</button>
-      <button onClick={approve}>3. Approve on-chain</button>
+    <div className="app">
+      {/* Navigation */}
+      <nav className="nav">
+        <div className="nav-container">
+          <div className="nav-logo">
+            <Shield className="logo-icon" />
+            <span className="logo-text">ZKClaim</span>
+          </div>
+          <div className="nav-links">
+            <a href="#features" className="nav-link">Features</a>
+            <a href="#how-it-works" className="nav-link">How It Works</a>
+            <a href="#demo" className="nav-link">Demo</a>
+            <button className="nav-button">Get Started</button>
+          </div>
+        </div>
+      </nav>
+
+      {/* Hero Section */}
+      <section className={`hero ${isVisible ? 'fade-in' : ''}`}>
+        <div className="hero-container">
+          <div className="hero-content">
+            <h1 className="hero-title">
+              Secure Healthcare Claims with 
+              <span className="highlight"> Zero-Knowledge Proofs</span>
+            </h1>
+            <p className="hero-description">
+              ZKClaim revolutionizes healthcare insurance by enabling privacy-preserving claim verification. 
+              Doctors and patients can prove medical procedures without revealing sensitive data.
+            </p>
+            <div className="hero-buttons">
+              <button className="primary-button">
+                Launch App
+                <ArrowRight className="button-icon" />
+              </button>
+              <button className="secondary-button">
+                View Demo
+                <Zap className="button-icon" />
+              </button>
+            </div>
+          </div>
+          <div className="hero-visual">
+            <div className="floating-card">
+              <div className="card-header">
+                <div className="card-icon">
+                  <Shield size={24} />
+                </div>
+                <span>Zero-Knowledge Proof</span>
+              </div>
+              <div className="card-content">
+                <div className="proof-item">
+                  <CheckCircle size={16} className="check-icon" />
+                  <span>Medical Procedure Verified</span>
+                </div>
+                <div className="proof-item">
+                  <CheckCircle size={16} className="check-icon" />
+                  <span>Patient Privacy Protected</span>
+                </div>
+                <div className="proof-item">
+                  <CheckCircle size={16} className="check-icon" />
+                  <span>Insurance Claim Validated</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section id="features" className="features">
+        <div className="container">
+          <h2 className="section-title">Why Choose ZKClaim?</h2>
+          <div className="features-grid">
+            <div className="feature-card">
+              <div className="feature-icon">
+                <Shield />
+              </div>
+              <h3>Privacy First</h3>
+              <p>Prove medical procedures without revealing sensitive patient data using advanced zero-knowledge cryptography.</p>
+            </div>
+            <div className="feature-card">
+              <div className="feature-icon">
+                <Zap />
+              </div>
+              <h3>Instant Verification</h3>
+              <p>Generate and verify proofs in seconds with our optimized circom circuits and zkVerify integration.</p>
+            </div>
+            <div className="feature-card">
+              <div className="feature-icon">
+                <Eye />
+              </div>
+              <h3>Transparent Process</h3>
+              <p>All verifications are recorded on-chain while maintaining complete privacy of medical information.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works */}
+      <section id="how-it-works" className="how-it-works">
+        <div className="container">
+          <h2 className="section-title">How ZKClaim Works</h2>
+          <div className="steps">
+            <div className="step">
+              <div className="step-number">1</div>
+              <div className="step-content">
+                <h3>Doctor Creates Proof</h3>
+                <p>Doctor generates a zero-knowledge proof of the medical procedure using procedure code, doctor ID, and date.</p>
+              </div>
+            </div>
+            <div className="step">
+              <div className="step-number">2</div>
+              <div className="step-content">
+                <h3>Patient Submits Claim</h3>
+                <p>Patient creates their own proof linking to the doctor's proof with claim amount and policy details.</p>
+              </div>
+            </div>
+            <div className="step">
+              <div className="step-number">3</div>
+              <div className="step-content">
+                <h3>zkVerify Validation</h3>
+                <p>Both proofs are verified and aggregated on zkVerify blockchain, ensuring validity without revealing data.</p>
+              </div>
+            </div>
+            <div className="step">
+              <div className="step-number">4</div>
+              <div className="step-content">
+                <h3>Cross-Chain Settlement</h3>
+                <p>Aggregated proofs are published to external chains for insurance claim processing and settlement.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Demo Section */}
+      <section id="demo" className="demo">
+        <div className="container">
+          <div className="demo-content">
+            <h2 className="section-title">Ready to Experience ZKClaim?</h2>
+            <p className="demo-description">
+              Try our interactive demo to see how zero-knowledge proofs work in healthcare claims processing.
+            </p>
+            <div className="demo-stats">
+              <div className="stat">
+                <div className="stat-number">100%</div>
+                <div className="stat-label">Privacy Preserved</div>
+              </div>
+              <div className="stat">
+                <div className="stat-number">&lt;5s</div>
+                <div className="stat-label">Proof Generation</div>
+              </div>
+              <div className="stat">
+                <div className="stat-number">∞</div>
+                <div className="stat-label">Verifications</div>
+              </div>
+            </div>
+            <button className="demo-button">
+              Launch Interactive Demo
+              <ArrowRight className="button-icon" />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="footer">
+        <div className="container">
+          <div className="footer-content">
+            <div className="footer-brand">
+              <Shield className="footer-logo" />
+              <span className="footer-title">ZKClaim</span>
+              <p className="footer-description">
+                Privacy-preserving healthcare claims with zero-knowledge proofs
+              </p>
+            </div>
+            <div className="footer-links">
+              <div className="footer-section">
+                <h4>Product</h4>
+                <a href="#features">Features</a>
+                <a href="#demo">Demo</a>
+                <a href="#docs">Documentation</a>
+              </div>
+              <div className="footer-section">
+                <h4>Company</h4>
+                <a href="#about">About</a>
+                <a href="#team">Team</a>
+                <a href="#careers">Careers</a>
+              </div>
+              <div className="footer-section">
+                <h4>Connect</h4>
+                <div className="social-links">
+                  <a href="#" className="social-link">
+                    <Github size={20} />
+                  </a>
+                  <a href="#" className="social-link">
+                    <Twitter size={20} />
+                  </a>
+                  <a href="#" className="social-link">
+                    <Linkedin size={20} />
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="footer-bottom">
+            <p>&copy; 2025 ZKClaim. All rights reserved.</p>
+            <div className="footer-bottom-links">
+              <a href="#privacy">Privacy Policy</a>
+              <a href="#terms">Terms of Service</a>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
