@@ -1,13 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, Zap, Eye, CheckCircle, ArrowRight, Github, Twitter, Linkedin } from 'lucide-react';
+import ZKClaimApp from './components/ZKClaimApp';
 import './App.css';
 
 function App() {
   const [isVisible, setIsVisible] = useState(false);
+  const [showApp, setShowApp] = useState(false);
 
   useEffect(() => {
     setIsVisible(true);
   }, []);
+
+  const handleLaunchApp = () => {
+    setShowApp(true);
+    // Smooth scroll to the app section
+    setTimeout(() => {
+      document.getElementById('zkclaim-app')?.scrollIntoView({ 
+        behavior: 'smooth' 
+      });
+    }, 100);
+  };
+
+  const handleViewDemo = () => {
+    handleLaunchApp();
+  };
 
   return (
     <div className="app">
@@ -22,7 +38,7 @@ function App() {
             <a href="#features" className="nav-link">Features</a>
             <a href="#how-it-works" className="nav-link">How It Works</a>
             <a href="#demo" className="nav-link">Demo</a>
-            <button className="nav-button">Get Started</button>
+            <button className="nav-button" onClick={handleLaunchApp}>Get Started</button>
           </div>
         </div>
       </nav>
@@ -40,11 +56,11 @@ function App() {
               Doctors and patients can prove medical procedures without revealing sensitive data.
             </p>
             <div className="hero-buttons">
-              <button className="primary-button">
+              <button className="primary-button" onClick={handleLaunchApp}>
                 Launch App
                 <ArrowRight className="button-icon" />
               </button>
-              <button className="secondary-button">
+              <button className="secondary-button" onClick={handleViewDemo}>
                 View Demo
                 <Zap className="button-icon" />
               </button>
@@ -76,6 +92,15 @@ function App() {
           </div>
         </div>
       </section>
+
+      {/* Interactive App Section */}
+      {showApp && (
+        <section id="zkclaim-app" className="app-section">
+          <div className="container">
+            <ZKClaimApp />
+          </div>
+        </section>
+      )}
 
       {/* Features Section */}
       <section id="features" className="features">
@@ -166,7 +191,7 @@ function App() {
                 <div className="stat-label">Verifications</div>
               </div>
             </div>
-            <button className="demo-button">
+            <button className="demo-button" onClick={handleLaunchApp}>
               Launch Interactive Demo
               <ArrowRight className="button-icon" />
             </button>

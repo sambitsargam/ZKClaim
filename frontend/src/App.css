@@ -375,6 +375,12 @@ body {
   text-align: center;
 }
 
+/* App Section */
+.app-section {
+  padding: 4rem 0;
+  background: #f8fafc;
+}
+
 .demo-description {
   font-size: 1.2rem;
   color: #64748b;
