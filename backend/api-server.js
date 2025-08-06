@@ -201,13 +201,22 @@ app.post('/api/verify-saved-proof', async (req, res) => {
       console.log(`🔗 Aggregation enabled for chain ID: ${CHAIN_ID}`);
     }
 
-    console.log('Submitting proof for verification...');
+    console.log('📤 Submitting proof for verification to zkVerify...');
+    console.log('  🔑 VK Hash:', vkHash);
+    console.log('  📊 Public Signals:', publicSignals);
+    console.log('  🏗️ Proof Library: snarkjs');
+    console.log('  📈 Curve: bn128');
+    
     const submitRes = await axios.post(
       `${RELAYER_API}/submit-proof/${RELAYER_KEY}`,
       params
     );
 
-    console.log("Proof submitted:", submitRes.data);
+    console.log("📥 Proof submission response:", {
+      optimisticVerify: submitRes.data.optimisticVerify,
+      jobId: submitRes.data.jobId,
+     // vkHash: submitRes.data.vkHash
+    });
     
     if (submitRes.data.optimisticVerify !== "success") {
       return res.status(400).json({
@@ -234,10 +243,33 @@ app.post('/api/verify-saved-proof', async (req, res) => {
         );
         
         const { status } = statusRes.data;
-        console.log(`Job ${jobId} status: ${status}`);
+        console.log(`🔄 Job ${jobId} status: ${status} (attempt ${attempts + 1}/${maxAttempts})`);
+        
+        // Log additional zkVerify details if available
+        if (statusRes.data.txHash) {
+          console.log(`  🔗 Transaction Hash: ${statusRes.data.txHash}`);
+        }
+        if (statusRes.data.blockHash) {
+          console.log(`  🏗️ Block Hash: ${statusRes.data.blockHash}`);
+        }
+        if (statusRes.data.aggregationId) {
+          console.log(`  📦 Aggregation ID: ${statusRes.data.aggregationId}`);
+        }
+        if (statusRes.data.merkleRoot) {
+          console.log(`  🌳 Merkle Root: ${statusRes.data.merkleRoot}`);
+        }
         
         if (status === targetStatus) {
-          console.log(`✅ Proof ${targetStatus.toLowerCase()} successfully`);
+          console.log(`✅ Proof ${targetStatus.toLowerCase()} successfully!`);
+          console.log(`🎉 Final zkVerify Details:`, {
+            jobId,
+            status,
+            txHash: statusRes.data.txHash,
+            blockHash: statusRes.data.blockHash,
+            aggregationId: statusRes.data.aggregationId,
+            merkleRoot: statusRes.data.merkleRoot,
+            proofType
+          });
           return res.json({
             success: true,
             verified: true,
@@ -317,12 +349,30 @@ app.post('/api/verify-proofs-from-files', async (req, res) => {
       const doctorProofData = JSON.parse(fs.readFileSync(doctorProofFile));
       const doctorPublicSignals = JSON.parse(fs.readFileSync(doctorPublicFile));
       
-      console.log('🏥 Verifying doctor proof...');
+      console.log('🏥 Starting doctor proof verification...');
+      console.log('  📊 Doctor Proof Hash:', doctorPublicSignals[0]);
+      console.log('  🔐 Doctor Proof Data Preview:', {
+        pi_a: doctorProofData.pi_a?.[0]?.slice(0, 20) + '...',
+        pi_b: doctorProofData.pi_b?.[0]?.[0]?.slice(0, 20) + '...',
+        pi_c: doctorProofData.pi_c?.[0]?.slice(0, 20) + '...'
+      });
+      
       const doctorVerifyResponse = await axios.post('http://localhost:3001/api/verify-saved-proof', {
         proofType: 'doctor',
         proofData: doctorProofData,
         publicSignals: doctorPublicSignals
       });
+      
+      console.log('✅ Doctor proof verification completed:', doctorVerifyResponse.data.verified);
+      if (doctorVerifyResponse.data.jobId) {
+        console.log('  🆔 zkVerify Job ID:', doctorVerifyResponse.data.jobId);
+      }
+      if (doctorVerifyResponse.data.txHash) {
+        console.log('  🔗 Transaction Hash:', doctorVerifyResponse.data.txHash);
+      }
+      if (doctorVerifyResponse.data.aggregationId) {
+        console.log('  📦 Aggregation ID:', doctorVerifyResponse.data.aggregationId);
+      }
       
       results.push({
         proofType: 'doctor',
@@ -350,12 +400,30 @@ app.post('/api/verify-proofs-from-files', async (req, res) => {
       const patientProofData = JSON.parse(fs.readFileSync(patientProofFile));
       const patientPublicSignals = JSON.parse(fs.readFileSync(patientPublicFile));
       
-      console.log('👤 Verifying patient proof...');
+      console.log('👤 Starting patient proof verification...');
+      console.log('  📊 Patient Proof Hash:', patientPublicSignals[0]);
+      console.log('  🔐 Patient Proof Data Preview:', {
+        pi_a: patientProofData.pi_a?.[0]?.slice(0, 20) + '...',
+        pi_b: patientProofData.pi_b?.[0]?.[0]?.slice(0, 20) + '...',
+        pi_c: patientProofData.pi_c?.[0]?.slice(0, 20) + '...'
+      });
+      
       const patientVerifyResponse = await axios.post('http://localhost:3001/api/verify-saved-proof', {
         proofType: 'patient',
         proofData: patientProofData,
         publicSignals: patientPublicSignals
       });
+      
+      console.log('✅ Patient proof verification completed:', patientVerifyResponse.data.verified);
+      if (patientVerifyResponse.data.jobId) {
+        console.log('  🆔 zkVerify Job ID:', patientVerifyResponse.data.jobId);
+      }
+      if (patientVerifyResponse.data.txHash) {
+        console.log('  🔗 Transaction Hash:', patientVerifyResponse.data.txHash);
+      }
+      if (patientVerifyResponse.data.aggregationId) {
+        console.log('  📦 Aggregation ID:', patientVerifyResponse.data.aggregationId);
+      }
       
       results.push({
         proofType: 'patient',
