@@ -1,18 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, Zap, Eye, CheckCircle, ArrowRight, Github, Twitter, Linkedin } from 'lucide-react';
+import { WagmiProvider } from 'wagmi';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { config } from './config/web3';
 import ZKClaimApp from './components/ZKClaimApp';
+import RoleSelector from './components/RoleSelector';
+import DoctorInterface from './components/DoctorInterface';
+import PatientInterface from './components/PatientInterface';
+import InsuranceInterface from './components/InsuranceInterface';
 import './App.css';
+
+const queryClient = new QueryClient();
 
 function App() {
   const [isVisible, setIsVisible] = useState(false);
   const [showApp, setShowApp] = useState(false);
+  const [selectedRole, setSelectedRole] = useState(null);
+  const [currentView, setCurrentView] = useState('landing'); // 'landing', 'demo', 'roles', 'interface'
 
   useEffect(() => {
     setIsVisible(true);
   }, []);
 
   const handleLaunchApp = () => {
+    setCurrentView('roles');
+  };
+
+  const handleViewDemo = () => {
     setShowApp(true);
+    setCurrentView('demo');
     // Smooth scroll to the app section
     setTimeout(() => {
       document.getElementById('zkclaim-app')?.scrollIntoView({ 
@@ -21,23 +37,100 @@ function App() {
     }, 100);
   };
 
-  const handleViewDemo = () => {
-    handleLaunchApp();
+  const handleRoleSelect = (role) => {
+    setSelectedRole(role);
+    setCurrentView('interface');
   };
 
+  const handleBackToLanding = () => {
+    setCurrentView('landing');
+    setShowApp(false);
+    setSelectedRole(null);
+  };
+
+  const handleBackToRoles = () => {
+    setCurrentView('roles');
+    setSelectedRole(null);
+  };
+
+  // Render role-specific interfaces
+  if (currentView === 'interface' && selectedRole) {
+    const RoleComponent = {
+      doctor: DoctorInterface,
+      patient: PatientInterface,
+      insurance: InsuranceInterface
+    }[selectedRole];
+
+    return (
+      <WagmiProvider config={config}>
+        <QueryClientProvider client={queryClient}>
+          <div className="app">
+            <nav className="nav">
+              <div className="nav-container">
+                <div className="nav-logo" onClick={handleBackToLanding}>
+                  <Shield className="logo-icon" />
+                  <span className="logo-text">ZKClaim</span>
+                </div>
+                <div className="nav-links">
+                  <button className="nav-button secondary" onClick={handleBackToRoles}>
+                    ← Back to Roles
+                  </button>
+                  <button className="nav-button" onClick={handleBackToLanding}>
+                    Home
+                  </button>
+                </div>
+              </div>
+            </nav>
+            <RoleComponent />
+          </div>
+        </QueryClientProvider>
+      </WagmiProvider>
+    );
+  }
+
+  // Render role selector
+  if (currentView === 'roles') {
+    return (
+      <WagmiProvider config={config}>
+        <QueryClientProvider client={queryClient}>
+          <div className="app">
+            <nav className="nav">
+              <div className="nav-container">
+                <div className="nav-logo" onClick={handleBackToLanding}>
+                  <Shield className="logo-icon" />
+                  <span className="logo-text">ZKClaim</span>
+                </div>
+                <div className="nav-links">
+                  <button className="nav-button secondary" onClick={handleBackToLanding}>
+                    ← Back to Home
+                  </button>
+                  <button className="nav-button" onClick={handleViewDemo}>
+                    View Demo
+                  </button>
+                </div>
+              </div>
+            </nav>
+            <RoleSelector onRoleSelect={handleRoleSelect} />
+          </div>
+        </QueryClientProvider>
+      </WagmiProvider>
+    );
+  }
+
+  // Render main landing page
   return (
     <div className="app">
       {/* Navigation */}
       <nav className="nav">
         <div className="nav-container">
-          <div className="nav-logo">
+          <div className="nav-logo" onClick={handleBackToLanding} style={{ cursor: 'pointer' }}>
             <Shield className="logo-icon" />
             <span className="logo-text">ZKClaim</span>
           </div>
           <div className="nav-links">
             <a href="#features" className="nav-link">Features</a>
             <a href="#how-it-works" className="nav-link">How It Works</a>
-            <a href="#demo" className="nav-link">Demo</a>
+            <button className="nav-link" onClick={handleViewDemo} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}>Demo</button>
             <button className="nav-button" onClick={handleLaunchApp}>Get Started</button>
           </div>
         </div>
@@ -97,7 +190,11 @@ function App() {
       {showApp && (
         <section id="zkclaim-app" className="app-section">
           <div className="container">
-            <ZKClaimApp />
+            <WagmiProvider config={config}>
+              <QueryClientProvider client={queryClient}>
+                <ZKClaimApp />
+              </QueryClientProvider>
+            </WagmiProvider>
           </div>
         </section>
       )}
