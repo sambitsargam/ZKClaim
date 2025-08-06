@@ -13,7 +13,7 @@ const DoctorInterface = () => {
     patientAddress: '',
     procedure_code: '',
     doctor_id: '',
-    date: '',
+    date: new Date().toISOString().slice(0,10).replace(/-/g, ''), // Today's date in YYYYMMDD format
     treatmentCost: '',
     medicalRecord: '',
     urgencyLevel: 'normal'
@@ -40,7 +40,7 @@ const DoctorInterface = () => {
   const fetchDoctorClaims = async () => {
     try {
       // This would fetch from your backend API
-      const response = await fetch(`/api/doctor-claims/${address}`);
+      const response = await fetch(`http://localhost:3001/api/doctor-claims/${address}`);
       const claims = await response.json();
       setClaimSubmissions(claims);
     } catch (error) {
@@ -52,7 +52,7 @@ const DoctorInterface = () => {
     setProofGeneration({ loading: true, step: 'Generating ZK proof...', proof: null });
     
     try {
-      const response = await fetch('/api/doctor-proof', {
+      const response = await fetch('http://localhost:3001/api/doctor-proof', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -108,8 +108,8 @@ const DoctorInterface = () => {
           patientData.patientAddress,
           patientData.procedure_code,
           patientData.treatmentCost,
-          proof.publicSignals,
-          proof.proof
+          proof.proofHash, // Use the proof hash from zkVerify
+          proof.txHash     // Include the transaction hash as well
         ],
       });
       
@@ -208,19 +208,27 @@ const DoctorInterface = () => {
                     value={patientData.doctor_id}
                     onChange={(e) => handleInputChange('doctor_id', e.target.value)}
                   />
+                  <small>Your unique medical license or NPI number</small>
                 </div>
 
                 <div className="form-group">
                   <label>Date (YYYYMMDD)</label>
                   <input
                     type="date"
-                    value={patientData.date}
+                    value={patientData.date ? 
+                      // Convert YYYYMMDD to YYYY-MM-DD for display
+                      patientData.date.length === 8 ? 
+                        `${patientData.date.slice(0,4)}-${patientData.date.slice(4,6)}-${patientData.date.slice(6,8)}` 
+                        : patientData.date
+                      : ''
+                    }
                     onChange={(e) => {
-                      // Convert date to YYYYMMDD format
+                      // Convert YYYY-MM-DD to YYYYMMDD for storage
                       const dateStr = e.target.value.replace(/-/g, '');
                       handleInputChange('date', dateStr);
                     }}
                   />
+                  <small>Date of the medical procedure</small>
                 </div>
               </div>
 

@@ -45,11 +45,15 @@ app.post('/api/doctor-proof', async (req, res) => {
     const result = await doctorFlow(doctorInput);
     
     console.log('Doctor proof generated successfully:', result);
-    res.json(result);
+    res.json({
+      success: true,
+      proof: result
+    });
 
   } catch (error) {
     console.error('Doctor proof generation error:', error);
     res.status(500).json({
+      success: false,
       error: 'Failed to generate doctor proof',
       details: error.message
     });
@@ -82,11 +86,15 @@ app.post('/api/patient-proof', async (req, res) => {
     const result = await patientFlow(patientInput);
     
     console.log('Patient proof generated successfully:', result);
-    res.json(result);
+    res.json({
+      success: true,
+      proof: result
+    });
 
   } catch (error) {
     console.error('Patient proof generation error:', error);
     res.status(500).json({
+      success: false,
       error: 'Failed to generate patient proof',
       details: error.message
     });

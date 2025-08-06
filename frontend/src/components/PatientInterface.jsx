@@ -49,7 +49,7 @@ const PatientInterface = () => {
 
   const fetchPatientClaims = async () => {
     try {
-      const response = await fetch(`/api/patient-claims/${address}`);
+      const response = await fetch(`http://localhost:3001/api/patient-claims/${address}`);
       const claims = await response.json();
       setMyClaims(claims);
     } catch (error) {
@@ -61,7 +61,7 @@ const PatientInterface = () => {
     setProofGeneration({ loading: true, step: 'Generating patient verification proof...', proof: null });
     
     try {
-      const response = await fetch('/api/patient-proof', {
+      const response = await fetch('http://localhost:3001/api/patient-proof', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -122,8 +122,8 @@ const PatientInterface = () => {
           claimData.patient_id,
           claimData.policy_limit,
           claimData.claim_amount,
-          proof.publicSignals,
-          proof.proof
+          proof.proofHash, // Use the proof hash from zkVerify
+          proof.txHash     // Include the transaction hash as well
         ],
       });
       
@@ -151,8 +151,8 @@ const PatientInterface = () => {
         functionName: 'approvePatientClaim',
         args: [
           claimId,
-          proof.publicSignals,
-          proof.proof
+          proof.proofHash, // Use the proof hash from zkVerify
+          proof.txHash     // Include the transaction hash as well
         ],
       });
       

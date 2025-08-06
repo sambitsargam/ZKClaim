@@ -9,8 +9,7 @@ import { defineChain } from 'viem'
 // 0. Setup queryClient
 const queryClient = new QueryClient()
 
-// 1. Get projectId at https://cloud.walletconnect.com
-const projectId = '47c2713ee4a43d13d0a2c32fdc80071f' // Demo project ID - replace with your own
+const projectId = '2987b6292605d325403d9c0a4c2c3c80' 
 
 // Define Horizen Testnet chain
 const horizenTestnet = defineChain({
@@ -41,7 +40,7 @@ const metadata = {
   icons: ['https://avatars.githubusercontent.com/u/37784886']
 }
 
-const chains = [mainnet, arbitrum, sepolia, baseSepolia, horizenTestnet] as const
+const chains = [ horizenTestnet] as const
 export const config = defaultWagmiConfig({
   chains,
   projectId,
