@@ -38,7 +38,7 @@ cd build/doctor
 snarkjs groth16 setup doctor.r1cs ../powers_of_tau.ptau doctor_0000.zkey
 snarkjs zkey contribute doctor_0000.zkey doctor_0001.zkey --name="1st Contributor Name" -v -e="random text"
 snarkjs zkey export verificationkey doctor_0001.zkey doctor_vk.json
-mv doctor_0001.zkey doctor.zkey
+mv doctor_0001.zkey doctor_final.zkey
 rm doctor_0000.zkey
 cd ../..
 
@@ -48,13 +48,13 @@ cd build/patient
 snarkjs groth16 setup patient.r1cs ../powers_of_tau.ptau patient_0000.zkey
 snarkjs zkey contribute patient_0000.zkey patient_0001.zkey --name="1st Contributor Name" -v -e="random text"
 snarkjs zkey export verificationkey patient_0001.zkey patient_vk.json
-mv patient_0001.zkey patient.zkey
+mv patient_0001.zkey patient_final.zkey
 rm patient_0000.zkey
 cd ../..
 
 echo "Circuit setup complete!"
 echo "Generated files:"
-echo "- build/doctor/doctor.zkey"
+echo "- build/doctor/doctor_final.zkey"
 echo "- build/doctor/doctor_vk.json"
-echo "- build/patient/patient.zkey"
+echo "- build/patient/patient_final.zkey"
 echo "- build/patient/patient_vk.json"

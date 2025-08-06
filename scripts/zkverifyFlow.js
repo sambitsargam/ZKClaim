@@ -133,16 +133,17 @@ class ZKVerifyFlow {
         }
     }
 
-    // Main flow execution
-    async execute() {
+    // Main flow execution with runtime inputs
+    async execute(doctorInput, patientInput) {
         try {
             // Load verification keys
             const doctorVK = JSON.parse(fs.readFileSync('./build/doctor/doctor_vk.json', 'utf8'));
             const patientVK = JSON.parse(fs.readFileSync('./build/patient/patient_vk.json', 'utf8'));
             
-            // Load test data
-            const doctorInput = JSON.parse(fs.readFileSync('./data/doctor_input.json', 'utf8'));
-            const patientInput = JSON.parse(fs.readFileSync('./data/patient_input.json', 'utf8'));
+            // Use provided inputs instead of loading from files
+            console.log('Using runtime inputs:');
+            console.log('Doctor input:', doctorInput);
+            console.log('Patient input:', patientInput);
             
             // Register verification keys
             const doctorVKResult = await this.registerVK(doctorVK, 'doctor');
@@ -152,17 +153,20 @@ class ZKVerifyFlow {
             const doctorProofData = await this.generateProof(
                 doctorInput,
                 './build/doctor/doctor_js/doctor.wasm',
-                './build/doctor/doctor.zkey'
+                './build/doctor/doctor_final.zkey'
             );
             
             // Update patient input with doctor proof hash (from public signals)
-            patientInput.doctor_proof_hash = doctorProofData.publicSignals[0];
+            const updatedPatientInput = {
+                ...patientInput,
+                doctor_proof_hash: doctorProofData.publicSignals[0]
+            };
             
             // Generate patient proof
             const patientProofData = await this.generateProof(
-                patientInput,
+                updatedPatientInput,
                 './build/patient/patient_js/patient.wasm',
-                './build/patient/patient.zkey'
+                './build/patient/patient_final.zkey'
             );
             
             // Submit doctor proof
@@ -212,10 +216,24 @@ class ZKVerifyFlow {
 // Export for use as module
 module.exports = ZKVerifyFlow;
 
-// Run directly if called as script
+// Run directly if called as script (for testing)
 if (require.main === module) {
+    // Generate sample inputs at runtime
+    const doctorInput = {
+        procedure_code: 1001,
+        doctor_id: Date.now(),
+        date: Number(new Date().toISOString().slice(0,10).replace(/-/g,''))
+    };
+    
+    const patientInput = {
+        doctor_proof_hash: "0", // Will be updated during execution
+        patient_id: Math.floor(Math.random()*1e9),
+        policy_limit: 500000,
+        claim_amount: 450000
+    };
+    
     const flow = new ZKVerifyFlow();
-    flow.execute()
+    flow.execute(doctorInput, patientInput)
         .then(result => {
             console.log(JSON.stringify(result));
             process.exit(0);
