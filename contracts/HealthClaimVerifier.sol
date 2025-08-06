@@ -32,6 +32,7 @@ contract HealthClaimVerifier {
   event PatientClaimSubmitted(address indexed patient, address indexed doctor, string patientProofHash, uint256 claimAmount);
   event ClaimVerified(uint256 indexed claimId, bool doctorVerified, bool patientVerified);
   event ClaimApproved(uint256 indexed claimId, uint256 amount);
+  event ClaimRejected(uint256 indexed claimId, string reason);
   event PaymentProcessed(uint256 indexed claimId, address indexed patient, uint256 amount);
 
   function submitDoctorClaim(string memory proofHash, address patientAddress) external {
@@ -97,6 +98,14 @@ contract HealthClaimVerifier {
     
     allClaims[claimId].status = ClaimStatus.Approved;
     emit ClaimApproved(claimId, allClaims[claimId].claimAmount);
+  }
+
+  function rejectClaim(uint256 claimId, string memory reason) external {
+    require(claimId < totalClaims, "Invalid claim ID");
+    require(allClaims[claimId].status == ClaimStatus.Pending || allClaims[claimId].status == ClaimStatus.Verified, "Cannot reject this claim");
+    
+    allClaims[claimId].status = ClaimStatus.Rejected;
+    emit ClaimRejected(claimId, reason);
   }
 
   function processPayment(uint256 claimId) external payable {

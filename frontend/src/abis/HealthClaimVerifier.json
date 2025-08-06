@@ -50,6 +50,16 @@
   },
   {
     "inputs": [
+      {"internalType": "uint256", "name": "claimId", "type": "uint256"},
+      {"internalType": "string", "name": "reason", "type": "string"}
+    ],
+    "name": "rejectClaim",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
       {"internalType": "uint256", "name": "claimId", "type": "uint256"}
     ],
     "name": "processPayment",
@@ -166,6 +176,15 @@
       {"indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256"}
     ],
     "name": "ClaimApproved",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "uint256", "name": "claimId", "type": "uint256"},
+      {"indexed": false, "internalType": "string", "name": "reason", "type": "string"}
+    ],
+    "name": "ClaimRejected",
     "type": "event"
   },
   {

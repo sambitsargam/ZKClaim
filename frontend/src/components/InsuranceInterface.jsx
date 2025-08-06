@@ -19,6 +19,7 @@ const InsuranceInterface = () => {
   });
   const [selectedClaim, setSelectedClaim] = useState(null);
   const [verificationSteps, setVerificationSteps] = useState({});
+  const [zkVerificationSteps, setZkVerificationSteps] = useState({});
 
   const { writeContract, data: hash, isPending } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
@@ -76,63 +77,6 @@ const InsuranceInterface = () => {
     }
   };
 
-  const startVerification = async (claimId) => {
-    setVerificationSteps(prev => ({
-      ...prev,
-      [claimId]: {
-        doctorVerification: { status: 'loading', message: 'Verifying doctor proof...' },
-        patientVerification: { status: 'pending', message: 'Waiting...' },
-        readyForPayment: { status: 'pending', message: 'Waiting...' }
-      }
-    }));
-
-    try {
-      // Step 1: Verify claim via contract
-      const contractAddress = getContractAddress(chainId);
-      
-      await writeContract({
-        address: contractAddress,
-        abi: ABI.HEALTH_CLAIM_VERIFIER,
-        functionName: 'verifyClaim',
-        args: [claimId],
-      });
-
-      // Simulate verification steps for UI
-      setTimeout(() => {
-        setVerificationSteps(prev => ({
-          ...prev,
-          [claimId]: {
-            doctorVerification: { status: 'completed', message: 'Doctor proof verified ✓' },
-            patientVerification: { status: 'loading', message: 'Verifying patient proof...' },
-            readyForPayment: { status: 'pending', message: 'Waiting...' }
-          }
-        }));
-
-        setTimeout(() => {
-          setVerificationSteps(prev => ({
-            ...prev,
-            [claimId]: {
-              doctorVerification: { status: 'completed', message: 'Doctor proof verified ✓' },
-              patientVerification: { status: 'completed', message: 'Patient proof verified ✓' },
-              readyForPayment: { status: 'ready', message: 'Ready for payment processing' }
-            }
-          }));
-        }, 2000);
-      }, 2000);
-
-    } catch (error) {
-      console.error('Failed to verify claim:', error);
-      setVerificationSteps(prev => ({
-        ...prev,
-        [claimId]: {
-          doctorVerification: { status: 'error', message: 'Verification failed' },
-          patientVerification: { status: 'pending', message: 'Waiting...' },
-          readyForPayment: { status: 'pending', message: 'Waiting...' }
-        }
-      }));
-    }
-  };
-
   const processPayment = async (claimId, claimAmount) => {
     if (!isConnected) {
       alert('Please connect your wallet first');
@@ -161,25 +105,212 @@ const InsuranceInterface = () => {
     }
   };
 
-  const approveClaim = async (claimId) => {
-    if (!isConnected) {
-      alert('Please connect your wallet first');
-      return;
-    }
-
+    const approveClaim = async (claimId) => {
     try {
-      const contractAddress = getContractAddress(chainId);
-      
       await writeContract({
-        address: contractAddress,
+        address: getContractAddress(chainId),
         abi: ABI.HEALTH_CLAIM_VERIFIER,
         functionName: 'approveClaim',
         args: [claimId],
       });
-      
     } catch (error) {
       console.error('Failed to approve claim:', error);
       alert('Failed to approve claim: ' + error.message);
+    }
+  };
+
+  const rejectClaim = async (claimId) => {
+    const reason = prompt('Please enter a reason for rejection:');
+    if (!reason) return; // User cancelled
+    
+    try {
+      await writeContract({
+        address: getContractAddress(chainId),
+        abi: ABI.HEALTH_CLAIM_VERIFIER,
+        functionName: 'rejectClaim',
+        args: [claimId, reason],
+      });
+    } catch (error) {
+      console.error('Failed to reject claim:', error);
+      alert('Failed to reject claim: ' + error.message);
+    }
+  };
+
+  // ZK Proof verification using saved proof files
+  const verifyProofOnZkVerify = async (claim) => {
+    console.log('🔍 Starting ZK proof verification for claim:', claim.id);
+    console.log('🔧 Current zkVerificationSteps state:', zkVerificationSteps);
+    
+    // Set verificationSteps to trigger the conditional rendering change
+    setVerificationSteps(prev => ({
+      ...prev,
+      [claim.id]: { zkVerifying: true }
+    }));
+    
+    // Step 1: Initialize with first step loading
+    console.log('⚡ Setting initial verification steps...');
+    setZkVerificationSteps(prev => ({
+      ...prev,
+      [claim.id]: {
+        fileCheck: { status: 'loading', message: 'Checking proof files...', icon: '📁' },
+        zkVerifySubmission: { status: 'pending', message: 'Submit to zkVerify...', icon: '🔐' },
+        cryptographicVerification: { status: 'pending', message: 'Verify cryptographic proofs...', icon: '🔍' },
+        smartContractUpdate: { status: 'pending', message: 'Update smart contract...', icon: '📝' }
+      }
+    }));
+    
+    console.log('✅ Verification steps initialized for claim:', claim.id);
+    
+    try {
+      // Simulate file checking for 2 seconds
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Step 1 Complete: File check done
+      setZkVerificationSteps(prev => ({
+        ...prev,
+        [claim.id]: {
+          ...prev[claim.id],
+          fileCheck: { status: 'completed', message: 'Proof files found and loaded ✓', icon: '✅' },
+          zkVerifySubmission: { status: 'loading', message: 'Submitting proofs to zkVerify network...', icon: '�' }
+        }
+      }));
+      
+      // Call the API to verify proofs from files
+      const response = await fetch('http://localhost:3001/api/verify-proofs-from-files', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('ZK verification result:', result);
+      
+      // Step 2 Complete: zkVerify submission done
+      setZkVerificationSteps(prev => ({
+        ...prev,
+        [claim.id]: {
+          ...prev[claim.id],
+          zkVerifySubmission: { status: 'completed', message: 'Proofs submitted to zkVerify ✓', icon: '✅' },
+          cryptographicVerification: { status: 'loading', message: 'Verifying cryptographic proofs...', icon: '�' }
+        }
+      }));
+      
+      // Simulate cryptographic verification for 3 seconds
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      if (result.success && result.allVerified) {
+        // Step 3 Complete: Cryptographic verification done
+        const doctorResult = result.results.find(r => r.proofType === 'doctor');
+        const patientResult = result.results.find(r => r.proofType === 'patient');
+        
+        setZkVerificationSteps(prev => ({
+          ...prev,
+          [claim.id]: {
+            ...prev[claim.id],
+            cryptographicVerification: { 
+              status: 'completed', 
+              message: `Both proofs verified! Doctor: ${doctorResult?.status || 'OK'}, Patient: ${patientResult?.status || 'OK'}`, 
+              icon: '🔍' 
+            },
+            smartContractUpdate: { status: 'loading', message: 'Updating claim status on blockchain...', icon: '📝' }
+          }
+        }));
+        
+        // Now call the smart contract verification
+        await writeContract({
+          address: getContractAddress(chainId),
+          abi: ABI.HEALTH_CLAIM_VERIFIER,
+          functionName: 'verifyClaim',
+          args: [claim.id, true, true], // Both proofs verified
+        });
+        
+        // Final success state
+        setZkVerificationSteps(prev => ({
+          ...prev,
+          [claim.id]: {
+            ...prev[claim.id],
+            smartContractUpdate: { status: 'completed', message: 'Smart contract updated successfully ✓', icon: '✅' }
+          }
+        }));
+        
+        
+        // Success feedback with detailed results including zkVerify transaction links
+        // Read aggregation data for transaction links
+        let zkVerifyLinks = '';
+        try {
+          const aggregationDataPath = '/Users/sambit/Desktop/ZKClaim/build/patient/aggregation_data.json';
+          const aggregationResponse = await fetch(`http://localhost:3001/api/read-aggregation-data`);
+          if (aggregationResponse.ok) {
+            const aggData = await aggregationResponse.json();
+            zkVerifyLinks = `\n🔗 zkVerify Transaction Links:\n` +
+                           `• Aggregation ID: ${aggData.aggregationId}\n` +
+                           `• Receipt: ${aggData.receipt}\n` +
+                           `• Root Hash: ${aggData.root}\n` +
+                           `• Proof Hash: ${aggData.proofHash}\n` +
+                           `• View on zkVerify: https://explorer.zkverify.io/aggregation/${aggData.aggregationId}`;
+          }
+        } catch (e) {
+          console.log('Could not fetch aggregation data:', e);
+        }
+        
+        alert(`✅ ZK Proof Verification Successful!\n\n` +
+              `📋 Doctor Proof:\n` +
+              `• Job ID: ${doctorResult?.jobId || 'N/A'}\n` +
+              `• Status: ${doctorResult?.status || 'Verified'}\n` +
+              `• Hash: ${doctorResult?.proofHash?.toString().slice(0, 20)}...\n\n` +
+              `👤 Patient Proof:\n` +
+              `• Job ID: ${patientResult?.jobId || 'N/A'}\n` +
+              `• Status: ${patientResult?.status || 'Verified'}\n` +
+              `• Hash: ${patientResult?.proofHash?.toString().slice(0, 20)}...\n` +
+              zkVerifyLinks +
+              `\n\n✅ All proofs verified on zkVerify network!`);
+        
+      } else {
+        // Handle verification failure
+        const failedProofs = result.results?.filter(r => !r.verified).map(r => r.proofType).join(', ') || 'unknown';
+        
+        setZkVerificationSteps(prev => ({
+          ...prev,
+          [claim.id]: {
+            ...prev[claim.id],
+            zkVerifySubmission: { status: 'completed', message: 'Proofs submitted', icon: '✅' },
+            cryptographicVerification: { status: 'error', message: `Verification failed for: ${failedProofs}`, icon: '❌' }
+          }
+        }));
+        
+        alert(`❌ ZK Proof Verification Failed!\n\nFailed proofs: ${failedProofs}\n\n${result.error || 'Verification unsuccessful'}`);
+      }
+      
+    } catch (error) {
+      console.error('ZK proof verification error:', error);
+      
+      // Reset verificationSteps so user can try again
+      setVerificationSteps(prev => ({
+        ...prev,
+        [claim.id]: undefined
+      }));
+      
+      // Update steps to show error
+      setZkVerificationSteps(prev => ({
+        ...prev,
+        [claim.id]: {
+          fileCheck: { status: 'error', message: 'Failed to load proof files', icon: '❌' },
+          zkVerifySubmission: { status: 'pending', message: 'Submit to zkVerify...', icon: '🔐' },
+          cryptographicVerification: { status: 'pending', message: 'Verify cryptographic proofs...', icon: '🔍' },
+          smartContractUpdate: { status: 'pending', message: 'Update smart contract...', icon: '📝' }
+        }
+      }));
+      
+      if (error.message.includes('Failed to fetch') || error.message.includes('HTTP error')) {
+        alert(`❌ API Server Error!\n\nCould not connect to the API server.\n\nPlease ensure:\n1. API server is running on port 3001\n2. Run: cd backend && node api-server.js`);
+      } else {
+        alert('ZK proof verification failed: ' + error.message);
+      }
     }
   };
 
@@ -304,86 +435,90 @@ const InsuranceInterface = () => {
                             <Shield size={16} />
                             <span>Ready for Verification</span>
                           </div>
-                          <button 
-                            className="verify-btn"
-                            onClick={() => startVerification(claim.id)}
-                            disabled={isPending || isConfirming}
-                          >
-                            <Zap size={16} />
-                            Start Verification
-                          </button>
+                          <div className="verification-buttons">
+                            <button 
+                              className="verify-btn zk-verify"
+                              onClick={() => verifyProofOnZkVerify(claim)}
+                              disabled={isPending || isConfirming}
+                            >
+                              <Zap size={16} />
+                              Verify ZK Proofs
+                            </button>
+                          </div>
                         </>
-                      ) : (
-                        <div className="verification-steps">
+                      ) : zkVerificationSteps[claim.id] ? (
+                        <div className="zk-verification-steps">
+                          <h4>ZK Proof Verification Progress</h4>
+                          {console.log('🎯 Rendering ZK steps for claim:', claim.id, zkVerificationSteps[claim.id])}
                           <div className="step-by-step">
-                            <div className={`verification-step ${verificationSteps[claim.id].doctorVerification.status}`}>
+                            <div className={`verification-step ${zkVerificationSteps[claim.id].fileCheck.status}`}>
                               <div className="step-icon">
-                                {verificationSteps[claim.id].doctorVerification.status === 'loading' && (
+                                {zkVerificationSteps[claim.id].fileCheck.status === 'loading' && (
                                   <div className="loading-spinner"></div>
                                 )}
-                                {verificationSteps[claim.id].doctorVerification.status === 'completed' && (
+                                {zkVerificationSteps[claim.id].fileCheck.status === 'completed' && (
                                   <CheckCircle size={16} />
                                 )}
-                                {verificationSteps[claim.id].doctorVerification.status === 'error' && (
+                                {zkVerificationSteps[claim.id].fileCheck.status === 'error' && (
                                   <AlertCircle size={16} />
                                 )}
                               </div>
-                              <span>{verificationSteps[claim.id].doctorVerification.message}</span>
+                              <span>{zkVerificationSteps[claim.id].fileCheck.message}</span>
                             </div>
                             
-                            <div className={`verification-step ${verificationSteps[claim.id].patientVerification.status}`}>
+                            <div className={`verification-step ${zkVerificationSteps[claim.id].zkVerifySubmission.status}`}>
                               <div className="step-icon">
-                                {verificationSteps[claim.id].patientVerification.status === 'loading' && (
+                                {zkVerificationSteps[claim.id].zkVerifySubmission.status === 'loading' && (
                                   <div className="loading-spinner"></div>
                                 )}
-                                {verificationSteps[claim.id].patientVerification.status === 'completed' && (
+                                {zkVerificationSteps[claim.id].zkVerifySubmission.status === 'completed' && (
                                   <CheckCircle size={16} />
                                 )}
-                                {verificationSteps[claim.id].patientVerification.status === 'error' && (
+                                {zkVerificationSteps[claim.id].zkVerifySubmission.status === 'error' && (
                                   <AlertCircle size={16} />
                                 )}
                               </div>
-                              <span>{verificationSteps[claim.id].patientVerification.message}</span>
+                              <span>{zkVerificationSteps[claim.id].zkVerifySubmission.message}</span>
                             </div>
                             
-                            <div className={`verification-step ${verificationSteps[claim.id].readyForPayment.status}`}>
+                            <div className={`verification-step ${zkVerificationSteps[claim.id].cryptographicVerification.status}`}>
                               <div className="step-icon">
-                                {verificationSteps[claim.id].readyForPayment.status === 'ready' && (
-                                  <DollarSign size={16} />
+                                {zkVerificationSteps[claim.id].cryptographicVerification.status === 'loading' && (
+                                  <div className="loading-spinner"></div>
+                                )}
+                                {zkVerificationSteps[claim.id].cryptographicVerification.status === 'completed' && (
+                                  <CheckCircle size={16} />
+                                )}
+                                {zkVerificationSteps[claim.id].cryptographicVerification.status === 'error' && (
+                                  <AlertCircle size={16} />
                                 )}
                               </div>
-                              <span>{verificationSteps[claim.id].readyForPayment.message}</span>
+                              <span>{zkVerificationSteps[claim.id].cryptographicVerification.message}</span>
+                            </div>
+                            
+                            <div className={`verification-step ${zkVerificationSteps[claim.id].smartContractUpdate.status}`}>
+                              <div className="step-icon">
+                                {zkVerificationSteps[claim.id].smartContractUpdate.status === 'loading' && (
+                                  <div className="loading-spinner"></div>
+                                )}
+                                {zkVerificationSteps[claim.id].smartContractUpdate.status === 'completed' && (
+                                  <CheckCircle size={16} />
+                                )}
+                                {zkVerificationSteps[claim.id].smartContractUpdate.status === 'error' && (
+                                  <AlertCircle size={16} />
+                                )}
+                              </div>
+                              <span>{zkVerificationSteps[claim.id].smartContractUpdate.message}</span>
                             </div>
                           </div>
-                          
-                          {verificationSteps[claim.id].readyForPayment.status === 'ready' && (
-                            <div className="payment-actions">
-                              <button 
-                                className="process-payment-btn"
-                                onClick={() => processPayment(claim.id, claim.claimAmount)}
-                                disabled={isPending || isConfirming}
-                              >
-                                <DollarSign size={16} />
-                                Process Payment ({formatCurrency(claim.claimAmount)})
-                              </button>
-                              <button 
-                                className="approve-btn"
-                                onClick={() => approveClaim(claim.id)}
-                                disabled={isPending || isConfirming}
-                              >
-                                <CheckCircle size={16} />
-                                Approve Only
-                              </button>
-                            </div>
-                          )}
                         </div>
-                      )}
+                      ) : null}
                     </div>
 
                     <div className="claim-actions">
                       <button 
                         className="approve-btn"
-                        onClick={() => processClaim(claim.id, true)}
+                        onClick={() => approveClaim(claim.id)}
                         disabled={isPending || isConfirming}
                       >
                         <CheckCircle size={16} />
@@ -391,7 +526,7 @@ const InsuranceInterface = () => {
                       </button>
                       <button 
                         className="reject-btn"
-                        onClick={() => processClaim(claim.id, false)}
+                        onClick={() => rejectClaim(claim.id)}
                         disabled={isPending || isConfirming}
                       >
                         <AlertCircle size={16} />

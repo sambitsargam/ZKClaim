@@ -288,6 +288,22 @@
   align-self: flex-start;
 }
 
+.verify-btn.zk-verify {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  margin-right: 0.5rem;
+}
+
+.verify-btn.zk-verify:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(139, 92, 246, 0.3);
+}
+
+.verification-buttons {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 .verify-btn:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 8px 16px rgba(59, 130, 246, 0.3);
@@ -303,6 +319,31 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+.zk-verification-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(124, 58, 237, 0.05) 100%);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.zk-verification-steps h4 {
+  margin: 0 0 1rem 0;
+  color: #7c3aed;
+  font-size: 1.1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.zk-verification-steps h4::before {
+  content: "⚡";
+  font-size: 1.2rem;
 }
 
 .step-by-step {
