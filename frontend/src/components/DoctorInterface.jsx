@@ -25,6 +25,7 @@ const DoctorInterface = () => {
     step: '',
     proof: null
   });
+  const [submissionSuccess, setSubmissionSuccess] = useState(false);
 
   const { writeContract, data: hash, isPending } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
@@ -44,6 +45,26 @@ const DoctorInterface = () => {
     if (isSuccess) {
       // Refresh claims after successful transaction
       refetchDoctorClaims();
+      
+      // Show success message and reset form
+      setSubmissionSuccess(true);
+      setPatientData({
+        patientAddress: '',
+        procedure_code: '',
+        doctor_id: '',
+        date: new Date().toISOString().slice(0,10).replace(/-/g, ''),
+        treatmentCost: '',
+        medicalRecord: '',
+        urgencyLevel: 'normal'
+      });
+      setProofGeneration({
+        loading: false,
+        step: '',
+        proof: null
+      });
+      
+      // Hide success message after 5 seconds
+      setTimeout(() => setSubmissionSuccess(false), 5000);
     }
   }, [isSuccess]);
 
@@ -180,6 +201,16 @@ const DoctorInterface = () => {
             </div>
 
             <div className="claim-form">
+              {submissionSuccess && (
+                <div className="success-message">
+                  <CheckCircle size={24} />
+                  <div>
+                    <h3>✅ Claim Submitted Successfully!</h3>
+                    <p>Your medical claim has been submitted to the blockchain and is now available for the patient to reference.</p>
+                  </div>
+                </div>
+              )}
+
               <div className="form-group">
                 <label>Patient Wallet Address</label>
                 <input

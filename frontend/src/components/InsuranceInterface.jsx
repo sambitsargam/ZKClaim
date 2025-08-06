@@ -45,6 +45,18 @@ const InsuranceInterface = () => {
   useEffect(() => {
     if (allPendingClaims) {
       setPendingClaims(allPendingClaims);
+    } else {
+      // Add test data for development when no real claims exist
+      setPendingClaims([
+        {
+          patientAddress: '0x742d35Cc6e6B5F8D6F1e4f2a9a6b7e3C2d1A9B8C',
+          doctorAddress: '0x123456789AbCdEf123456789AbCdEf1234567890',
+          claimAmount: BigInt('1000000000000000000'), // 1 ETH in wei
+          status: 1, // Verified status
+          doctorProofHash: 'QmTestDoctorProof123',
+          patientProofHash: 'QmTestPatientProof456'
+        }
+      ]);
     }
   }, [allPendingClaims]);
 
@@ -103,57 +115,184 @@ const InsuranceInterface = () => {
 
   const approveClaim = async (claimId) => {
     try {
-      const contractAddress = getContractAddress(chainId);
+      console.log(`🔄 Starting approval process for claim ${claimId}`);
       
-      await writeContract({
+      // Validate inputs
+      if (!chainId) {
+        throw new Error('No chain ID available');
+      }
+      
+      if (!isConnected) {
+        throw new Error('Wallet not connected');
+      }
+      
+      // Ensure claimId is defined and valid
+      if (claimId === undefined || claimId === null) {
+        throw new Error('Invalid claim ID');
+      }
+      
+      const contractAddress = getContractAddress(chainId);
+      console.log(`📋 Contract address: ${contractAddress}`);
+      console.log(`⛓️ Chain ID: ${chainId}`);
+      console.log(`🔗 Connected address: ${address}`);
+      
+      // Call writeContract with proper error handling
+      const result = await writeContract({
         address: contractAddress,
         abi: ABI.HEALTH_CLAIM_VERIFIER,
         functionName: 'approveClaim',
-        args: [claimId],
+        args: [BigInt(claimId)], // Ensure claimId is BigInt for Solidity uint256
       });
       
-      // Show success message
-      console.log(`Successfully approved claim ${claimId}`);
+      console.log(`✅ Transaction submitted for claim ${claimId}`, result);
+      console.log(`📋 Transaction hash: ${hash}`);
+      
+      // Success message will be shown in useEffect when isSuccess becomes true
       
     } catch (error) {
-      console.error('Error approving claim:', error);
-      alert('Failed to approve claim: ' + error.message);
+      console.error('❌ Error approving claim:', error);
+      
+      // More detailed error handling
+      let errorMessage = 'Failed to approve claim';
+      
+      if (error.message?.includes('User rejected')) {
+        errorMessage = 'Transaction was rejected by user';
+      } else if (error.message?.includes('insufficient funds')) {
+        errorMessage = 'Insufficient funds for gas fees';
+      } else if (error.message?.includes('execution reverted')) {
+        errorMessage = 'Transaction reverted - check claim status and permissions';
+      } else if (error.message?.includes('Claim not verified')) {
+        errorMessage = 'Claim must be verified before it can be approved. Please verify the claim first.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      alert(`❌ ${errorMessage}`);
+    }
+  };
+
+  const verifyClaim = async (claimId) => {
+    try {
+      console.log(`🔄 Starting verification process for claim ${claimId}`);
+      
+      // Validate inputs
+      if (!chainId) {
+        throw new Error('No chain ID available');
+      }
+      
+      if (!isConnected) {
+        throw new Error('Wallet not connected');
+      }
+      
+      // Ensure claimId is defined and valid
+      if (claimId === undefined || claimId === null) {
+        throw new Error('Invalid claim ID');
+      }
+      
+      const contractAddress = getContractAddress(chainId);
+      console.log(`📋 Verifying claim ${claimId} on contract: ${contractAddress}`);
+      
+      // Call verifyClaim function with both proofs verified as true
+      const result = await writeContract({
+        address: contractAddress,
+        abi: ABI.HEALTH_CLAIM_VERIFIER,
+        functionName: 'verifyClaim',
+        args: [BigInt(claimId), true, true], // claimId, doctorVerified, patientVerified
+      });
+      
+      console.log(`✅ Verification transaction submitted for claim ${claimId}`, result);
+      
+      // Success message will be shown in useEffect when isSuccess becomes true
+      
+    } catch (error) {
+      console.error('❌ Error verifying claim:', error);
+      
+      // More detailed error handling
+      let errorMessage = 'Failed to verify claim';
+      
+      if (error.message?.includes('User rejected')) {
+        errorMessage = 'Transaction was rejected by user';
+      } else if (error.message?.includes('insufficient funds')) {
+        errorMessage = 'Insufficient funds for gas fees';
+      } else if (error.message?.includes('execution reverted')) {
+        errorMessage = 'Transaction reverted - check claim ID and permissions';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      alert(`❌ ${errorMessage}`);
     }
   };
 
   const rejectClaim = async (claimId) => {
     try {
-      const contractAddress = getContractAddress(chainId);
+      console.log(`🔄 Starting rejection process for claim ${claimId}`);
       
-      await writeContract({
+      // Validate inputs
+      if (!chainId) {
+        throw new Error('No chain ID available');
+      }
+      
+      if (!isConnected) {
+        throw new Error('Wallet not connected');
+      }
+      
+      // Ensure claimId is defined and valid
+      if (claimId === undefined || claimId === null) {
+        throw new Error('Invalid claim ID');
+      }
+      
+      const contractAddress = getContractAddress(chainId);
+      console.log(`📋 Contract address: ${contractAddress}`);
+      console.log(`⛓️ Chain ID: ${chainId}`);
+      console.log(`🔗 Connected address: ${address}`);
+      
+      // Call writeContract with proper error handling
+      const result = await writeContract({
         address: contractAddress,
         abi: ABI.HEALTH_CLAIM_VERIFIER,
         functionName: 'rejectClaim',
-        args: [claimId],
+        args: [BigInt(claimId), "Claim rejected by insurance reviewer"], // Add required reason parameter
       });
       
-      // Show success message
-      console.log(`Successfully rejected claim ${claimId}`);
+      console.log(`✅ Rejection transaction submitted for claim ${claimId}`, result);
+      console.log(`📋 Transaction hash: ${hash}`);
+      
+      // Success message will be shown in useEffect when isSuccess becomes true
       
     } catch (error) {
-      console.error('Error rejecting claim:', error);
-      alert('Failed to reject claim: ' + error.message);
+      console.error('❌ Error rejecting claim:', error);
+      
+      // More detailed error handling
+      let errorMessage = 'Failed to reject claim';
+      
+      if (error.message?.includes('User rejected')) {
+        errorMessage = 'Transaction was rejected by user';
+      } else if (error.message?.includes('insufficient funds')) {
+        errorMessage = 'Insufficient funds for gas fees';
+      } else if (error.message?.includes('execution reverted')) {
+        errorMessage = 'Transaction reverted - check claim status and permissions';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      alert(`❌ ${errorMessage}`);
     }
   };
 
-  const verifyProofOnZkVerify = async (claim) => {
-    console.log('🔍 Starting ZK proof verification for claim:', claim.id);
+  const verifyProofOnZkVerify = async (claim, claimIndex) => {
+    console.log('🔍 Starting ZK proof verification for claim:', claimIndex);
     
     // Set verificationSteps to trigger the conditional rendering change
     setVerificationSteps(prev => ({
       ...prev,
-      [claim.id]: { zkVerifying: true }
+      [claimIndex]: { zkVerifying: true }
     }));
     
     // Step 1: Initialize with first step loading
     setZkVerificationSteps(prev => ({
       ...prev,
-      [claim.id]: {
+      [claimIndex]: {
         fileCheck: { 
           status: 'loading', 
           message: 'Validating proof files and checking structure...', 
@@ -179,8 +318,8 @@ const InsuranceInterface = () => {
       // Step 1 Complete: File check done
       setZkVerificationSteps(prev => ({
         ...prev,
-        [claim.id]: {
-          ...prev[claim.id],
+        [claimIndex]: {
+          ...prev[claimIndex],
           fileCheck: { 
             status: 'completed', 
             message: 'Proof files validated successfully ✓',
@@ -219,8 +358,8 @@ const InsuranceInterface = () => {
       // Step 2 Complete: zkVerify submission done
       setZkVerificationSteps(prev => ({
         ...prev,
-        [claim.id]: {
-          ...prev[claim.id],
+        [claimIndex]: {
+          ...prev[claimIndex],
           zkVerifySubmission: { 
             status: 'completed', 
             message: 'Proofs submitted to zkVerify network ✓',
@@ -255,8 +394,8 @@ const InsuranceInterface = () => {
         // Step 3 Complete: Cryptographic verification done with real zkVerify data
         setZkVerificationSteps(prev => ({
           ...prev,
-          [claim.id]: {
-            ...prev[claim.id],
+          [claimIndex]: {
+            ...prev[claimIndex],
             cryptographicVerification: { 
               status: 'completed', 
               message: `Zero-knowledge proofs verified on zkVerify testnet ✓`,
@@ -284,7 +423,7 @@ const InsuranceInterface = () => {
           }
         }));
         
-        await recordVerificationResult(claim.id, 'success', {
+        await recordVerificationResult(claimIndex, 'success', {
           doctorResult,
           patientResult,
           aggregationData
@@ -296,8 +435,8 @@ const InsuranceInterface = () => {
         
         setZkVerificationSteps(prev => ({
           ...prev,
-          [claim.id]: {
-            ...prev[claim.id],
+          [claimIndex]: {
+            ...prev[claimIndex],
             cryptographicVerification: { 
               status: 'error', 
               message: `Cryptographic verification failed`,
@@ -310,7 +449,7 @@ const InsuranceInterface = () => {
           }
         }));
 
-        await recordVerificationResult(claim.id, 'failure', {
+        await recordVerificationResult(claimIndex, 'failure', {
           failedProofs,
           error: result.error
         });
@@ -322,14 +461,14 @@ const InsuranceInterface = () => {
       // Reset verificationSteps so user can try again
       setVerificationSteps(prev => ({
         ...prev,
-        [claim.id]: undefined
+        [claimIndex]: undefined
       }));
       
       // Update steps to show error
       setZkVerificationSteps(prev => ({
         ...prev,
-        [claim.id]: {
-          ...prev[claim.id],
+        [claimIndex]: {
+          ...prev[claimIndex],
           fileCheck: { 
             status: 'error', 
             message: `Verification failed: ${error.message}`,
@@ -338,7 +477,7 @@ const InsuranceInterface = () => {
         }
       }));
       
-      await recordVerificationResult(claim.id, 'error', {
+      await recordVerificationResult(claimIndex, 'error', {
         error: error.message
       });
       
@@ -409,7 +548,11 @@ const InsuranceInterface = () => {
         </div>
         <div className="wallet-status connected">
           <Eye size={16} />
-          Insurer Connected
+          {isConnected ? (
+            <span>Connected: {address?.slice(0, 6)}...{address?.slice(-4)}</span>
+          ) : (
+            <span>Not Connected</span>
+          )}
         </div>
       </div>
 
@@ -444,10 +587,10 @@ const InsuranceInterface = () => {
                 <p>New insurance claims will appear here for review</p>
               </div>
             ) : (
-              pendingClaims.map((claim) => (
-                <div key={claim.id} className="claim-card">
+              pendingClaims.map((claim, index) => (
+                <div key={index} className="claim-card">
                   <div className="claim-header">
-                    <div className="claim-id">#{claim.id}</div>
+                    <div className="claim-id">#{index}</div>
                     <div className={`claim-status ${getStatusColor(claim.status)}`}>
                       {getStatusText(claim.status)}
                     </div>
@@ -458,8 +601,8 @@ const InsuranceInterface = () => {
                       <strong>Patient:</strong> {claim.patientAddress?.slice(0, 6)}...{claim.patientAddress?.slice(-4)}
                     </div>
                     {/* Only show amount after ZK proof verification is completed */}
-                    {zkVerificationSteps[claim.id] && 
-                     zkVerificationSteps[claim.id].cryptographicVerification?.status === 'completed' ? (
+                    {zkVerificationSteps[index] && 
+                     zkVerificationSteps[index].cryptographicVerification?.status === 'completed' ? (
                       <div className="claim-info verified-amount">
                         <strong>Amount:</strong> {formatCurrency(Number(claim.claimAmount || claim.amount || 0))}
                         <span className="verified-badge">✓ ZK Verified</span>
@@ -473,7 +616,7 @@ const InsuranceInterface = () => {
                   </div>
 
                   <div className="claim-verification">
-                    {!verificationSteps[claim.id] ? (
+                    {!verificationSteps[index] ? (
                       <>
                         <div className="verification-status">
                           <Shield size={16} />
@@ -482,7 +625,7 @@ const InsuranceInterface = () => {
                         <div className="verification-buttons">
                           <button 
                             className="verify-btn zk-verify"
-                            onClick={() => verifyProofOnZkVerify(claim)}
+                            onClick={() => verifyProofOnZkVerify(claim, index)}
                             disabled={isPending || isConfirming}
                           >
                             <Zap size={16} />
@@ -490,7 +633,7 @@ const InsuranceInterface = () => {
                           </button>
                         </div>
                       </>
-                    ) : zkVerificationSteps[claim.id] ? (
+                    ) : zkVerificationSteps[index] ? (
                       <div className="zk-verification-container">
                         <div className="verification-header">
                           <div className="verification-title">
@@ -499,7 +642,7 @@ const InsuranceInterface = () => {
                           </div>
                           <div className="verification-progress">
                             {(() => {
-                              const steps = zkVerificationSteps[claim.id];
+                              const steps = zkVerificationSteps[index];
                               const completed = Object.values(steps).filter(step => step.status === 'completed').length;
                               const total = Object.keys(steps).length;
                               const percentage = (completed / total) * 100;
@@ -538,8 +681,8 @@ const InsuranceInterface = () => {
                               title: 'Cryptographic Verification',
                               description: 'Verifying zero-knowledge proofs and generating verification links'
                             }
-                          ].map((step, index) => {
-                            const stepData = zkVerificationSteps[claim.id][step.key];
+                          ].map((step, stepIndex) => {
+                            const stepData = zkVerificationSteps[index][step.key];
                             const isActive = stepData.status === 'loading';
                             const isCompleted = stepData.status === 'completed';
                             const hasError = stepData.status === 'error';
@@ -742,13 +885,31 @@ const InsuranceInterface = () => {
                   </div>
 
                   <div className="claim-actions">
-                    {/* Only show approve/reject buttons after ZK verification is complete */}
-                    {zkVerificationSteps[claim.id] && 
-                     zkVerificationSteps[claim.id].cryptographicVerification?.status === 'completed' ? (
+                    {/* First show verification if ZK verification is complete but claim not verified */}
+                    {zkVerificationSteps[index] && 
+                     zkVerificationSteps[index].cryptographicVerification?.status === 'completed' &&
+                     getStatusText(claim.status) === 'Pending' ? (
+                      <>
+                        <button 
+                          className="verify-btn"
+                          onClick={() => verifyClaim(index)}
+                          disabled={isPending || isConfirming}
+                        >
+                          <Shield size={16} />
+                          {isPending || isConfirming ? 'Processing...' : 'Verify Claim'}
+                        </button>
+                        <div className="verification-note">
+                          <span>Verify claim first to enable approval/rejection</span>
+                        </div>
+                      </>
+                    ) : zkVerificationSteps[index] && 
+                         zkVerificationSteps[index].cryptographicVerification?.status === 'completed' &&
+                         getStatusText(claim.status) === 'Verified' ? (
+                      /* Show approve/reject buttons after claim is verified */
                       <>
                         <button 
                           className="approve-btn"
-                          onClick={() => approveClaim(claim.id)}
+                          onClick={() => approveClaim(index)}
                           disabled={isPending || isConfirming}
                         >
                           <CheckCircle size={16} />
@@ -756,7 +917,7 @@ const InsuranceInterface = () => {
                         </button>
                         <button 
                           className="reject-btn"
-                          onClick={() => rejectClaim(claim.id)}
+                          onClick={() => rejectClaim(index)}
                           disabled={isPending || isConfirming}
                         >
                           <AlertCircle size={16} />
@@ -766,7 +927,7 @@ const InsuranceInterface = () => {
                     ) : (
                       <div className="verification-required">
                         <Shield size={16} />
-                        <span>Complete ZK verification to approve/reject claim</span>
+                        <span>Complete ZK verification to proceed with claim processing</span>
                       </div>
                     )}
                   </div>

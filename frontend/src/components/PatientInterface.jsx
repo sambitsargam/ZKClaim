@@ -34,6 +34,7 @@ const PatientInterface = () => {
     step: '',
     proof: null
   });
+  const [submissionSuccess, setSubmissionSuccess] = useState(false);
 
   const { writeContract, data: hash, isPending } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
@@ -89,6 +90,23 @@ const PatientInterface = () => {
   useEffect(() => {
     if (isSuccess) {
       refetchClaims();
+      
+      // Show success message and reset form
+      setSubmissionSuccess(true);
+      setClaimData({
+        doctor_proof_hash: '',
+        patient_id: '',
+        policy_limit: '',
+        claim_amount: ''
+      });
+      setProofGeneration({
+        loading: false,
+        step: '',
+        proof: null
+      });
+      
+      // Hide success message after 5 seconds
+      setTimeout(() => setSubmissionSuccess(false), 5000);
     }
   }, [isSuccess]);
 
@@ -416,6 +434,16 @@ const PatientInterface = () => {
             </div>
 
             <div className="claim-form">
+              {submissionSuccess && (
+                <div className="success-message">
+                  <CheckCircle size={24} />
+                  <div>
+                    <h3>✅ Claim Submitted Successfully!</h3>
+                    <p>Your insurance claim has been submitted to the blockchain and is now available for insurance review.</p>
+                  </div>
+                </div>
+              )}
+
               <div className="usage-guide">
                 <h3>📋 Quick Start Guide</h3>
                 <ol>
