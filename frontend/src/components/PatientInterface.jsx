@@ -58,6 +58,15 @@ const PatientInterface = () => {
     enabled: isConnected && chainId,
   });
 
+  // Fetch patient's own claims from contract
+  const { data: allClaims, refetch: refetchClaims } = useReadContract({
+    address: getContractAddress(chainId),
+    abi: ABI.HEALTH_CLAIM_VERIFIER,
+    functionName: 'getAllPendingClaims',
+    args: [],
+    enabled: isConnected && chainId,
+  });
+
   // Debug: Get total doctors to check if any doctor has submitted
   const { data: totalDoctors } = useReadContract({
     address: getContractAddress(chainId),
@@ -68,14 +77,18 @@ const PatientInterface = () => {
   });
 
   useEffect(() => {
-    if (isConnected) {
-      fetchPatientClaims();
+    if (isConnected && allClaims) {
+      // Filter claims to show only the current patient's claims
+      const patientClaims = allClaims.filter(claim => 
+        claim.patientAddress.toLowerCase() === address.toLowerCase()
+      );
+      setMyClaims(patientClaims);
     }
-  }, [isConnected, address]);
+  }, [isConnected, address, allClaims]);
 
   useEffect(() => {
     if (isSuccess) {
-      fetchPatientClaims();
+      refetchClaims();
     }
   }, [isSuccess]);
 
@@ -147,15 +160,16 @@ const PatientInterface = () => {
     }
   };
 
-  const fetchPatientClaims = async () => {
-    try {
-      const response = await fetch(`http://localhost:3001/api/patient-claims/${address}`);
-      const claims = await response.json();
-      setMyClaims(claims);
-    } catch (error) {
-      console.error('Failed to fetch claims:', error);
-    }
-  };
+  // No longer needed - claims are fetched directly from contract
+  // const fetchPatientClaims = async () => {
+  //   try {
+  //     const response = await fetch(`http://localhost:3001/api/patient-claims/${address}`);
+  //     const claims = await response.json();
+  //     setMyClaims(claims);
+  //   } catch (error) {
+  //     console.error('Failed to fetch claims:', error);
+  //   }
+  // };
 
   const generatePatientProof = async (claimInputs) => {
     setProofGeneration({ loading: true, step: 'Generating patient verification proof...', proof: null });
@@ -213,18 +227,23 @@ const PatientInterface = () => {
       return;
     }
 
+    if (!consent.doctorAddress) {
+      alert('Please set up doctor access consent first to specify the doctor address');
+      return;
+    }
+
     try {
       const proof = await generatePatientProof(claimData);
       
       const contractAddress = getContractAddress(chainId);
       
-      // Submit with simplified parameters (ZK principle - minimal on-chain data)
+      // Submit with actual doctor address from consent form
       writeContract({
         address: contractAddress,
         abi: ABI.HEALTH_CLAIM_VERIFIER,
         functionName: 'submitPatientClaim',
         args: [
-          address, // doctor address (will need to be updated to actual doctor address)
+          consent.doctorAddress, // Use doctor address from consent form
           claimData.doctor_proof_hash,
           proof.proofHash, // patient proof hash
           parseInt(claimData.claim_amount)
@@ -343,6 +362,13 @@ const PatientInterface = () => {
     }
   };
 
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount);
+  };
+
   const tabs = [
     { id: 'submit', label: 'Submit Claim', icon: FileText },
     { id: 'claims', label: 'My Claims', icon: Clock },
@@ -390,6 +416,16 @@ const PatientInterface = () => {
             </div>
 
             <div className="claim-form">
+              <div className="usage-guide">
+                <h3>📋 Quick Start Guide</h3>
+                <ol>
+                  <li><strong>Set Doctor Access:</strong> Go to "Doctor Access" tab and add your doctor's wallet address</li>
+                  <li><strong>Doctor Generates Proof:</strong> Your doctor needs to generate a proof first (using Doctor Portal)</li>
+                  <li><strong>Fetch Proof Hash:</strong> Click "Auto-Fetch" to get the latest doctor proof</li>
+                  <li><strong>Submit Claim:</strong> Fill in your details and submit the claim</li>
+                </ol>
+              </div>
+              
               <div className="form-group">
                 <label>Doctor Proof Hash</label>
                 <div className="auto-fetch-container">
@@ -418,11 +454,15 @@ const PatientInterface = () => {
                 {!autoFetchStatus.success && !autoFetchStatus.error && (
                   <small>Click "Auto-Fetch" to automatically get the latest doctor proof hash</small>
                 )}
+                {!consent.doctorAddress && (
+                  <small className="warning-message">⚠️ Please set up doctor access in the "Doctor Access" tab first to specify the doctor's address</small>
+                )}
                 {process.env.NODE_ENV === 'development' && (
                   <small className="debug-info">
                     Debug: Chain {chainId}, Doctors: {totalDoctors || 0}<br/>
                     Patient-specific: {patientSpecificProofHash || 'none'}<br/>
-                    Latest general: {latestDoctorProofHash || 'none'}
+                    Latest general: {latestDoctorProofHash || 'none'}<br/>
+                    Doctor Address: {consent.doctorAddress || 'not set'}
                   </small>
                 )}
               </div>
@@ -502,28 +542,31 @@ const PatientInterface = () => {
                 myClaims.map((claim, index) => (
                   <div key={index} className="claim-card">
                     <div className="claim-header">
-                      <div className="claim-id">#{claim.id}</div>
+                      <div className="claim-id">#{index + 1}</div>
                       <div className={`claim-status ${getStatusColor(claim.status)}`}>
                         {getStatusText(claim.status)}
                       </div>
                     </div>
                     
                     <div className="claim-details">
-                      <div className="claim-info">
+                      {/* <div className="claim-info">
                         <strong>Doctor:</strong> {claim.doctorAddress?.slice(0, 6)}...{claim.doctorAddress?.slice(-4)}
                       </div>
                       <div className="claim-info">
-                        <strong>Diagnosis:</strong> {claim.diagnosis}
+                        <strong>Patient:</strong> {claim.patientAddress?.slice(0, 6)}...{claim.patientAddress?.slice(-4)}
+                      </div> */}
+                      <div className="claim-info">
+                        <strong>Amount:</strong> {formatCurrency(Number(claim.claimAmount))}
                       </div>
                       <div className="claim-info">
-                        <strong>Amount:</strong> ${claim.amount}
+                        <strong>Doctor Proof:</strong> {claim.doctorProofHash?.slice(0, 10)}...
                       </div>
                       <div className="claim-info">
-                        <strong>Date:</strong> {new Date(claim.timestamp).toLocaleDateString()}
+                        <strong>Patient Proof:</strong> {claim.patientProofHash?.slice(0, 10)}...
                       </div>
                     </div>
 
-                    {claim.status === 'pending' && (
+                    {Number(claim.status) === 0 && ( // 0 = pending
                       <div className="claim-actions">
                         {proofGeneration.loading ? (
                           <div className="proof-status">

@@ -3,7 +3,7 @@ import HealthClaimVerifierABI from '../abis/HealthClaimVerifier.json'
 // Contract addresses for different networks
 export const CONTRACT_ADDRESSES = {
   // Horizen Testnet
-  845320009: '0x4a66F27329Cc3410a9dCc61A019a60A0767c127E',
+  845320009: '0x55e5B3A258d3F4f3a74883E34741DA0159093c2B',
 }
 
 export const ABI = {
