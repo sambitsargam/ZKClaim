@@ -380,16 +380,9 @@ const InsuranceInterface = () => {
       await new Promise(resolve => setTimeout(resolve, 3000));
       
       if (result.success && result.allVerified) {
-        // Fetch aggregation data for zkVerify links
-        let aggregationData = null;
-        try {
-          const aggregationResponse = await fetch(`http://localhost:3001/api/read-aggregation-data`);
-          if (aggregationResponse.ok) {
-            aggregationData = await aggregationResponse.json();
-          }
-        } catch (e) {
-          console.log('Could not fetch aggregation data:', e);
-        }
+        // Use the actual verification result data instead of fetching static aggregation data
+        const doctorResult = result.results?.find(r => r.proofType === 'doctor');
+        const patientResult = result.results?.find(r => r.proofType === 'patient');
 
         // Step 3 Complete: Cryptographic verification done with real zkVerify data
         setZkVerificationSteps(prev => ({
@@ -400,24 +393,24 @@ const InsuranceInterface = () => {
               status: 'completed', 
               message: `Zero-knowledge proofs verified on zkVerify testnet ✓`,
               details: {
-                doctorProofStatus: doctorResult?.status || 'Aggregated',
-                patientProofStatus: patientResult?.status || 'Aggregated',
-                doctorProofHash: doctorResult?.proofHash?.toString() || '20956175647799868792879429687887607755607533264237088736325111033487450135332',
-                patientProofHash: patientResult?.proofHash?.toString() || '6007241817503321608405768069594740260821903767172207930494307314756061204975',
+                doctorProofStatus: doctorResult?.status || 'Verified',
+                patientProofStatus: patientResult?.status || 'Verified',
+                doctorProofHash: doctorResult?.proofHash?.toString() || 'N/A',
+                patientProofHash: patientResult?.proofHash?.toString() || 'N/A',
                 verificationTime: new Date().toISOString(),
-                // Real zkVerify testnet explorer links
-                doctorZkVerifyLink: `https://zkverify-testnet.subscan.io/tx/${aggregationData?.doctorTxHash || '0x26f5bca2ccce81131eb30a5772fdc707c046c98ca88f34a2f042bb869d93bc25'}`,
-                patientZkVerifyLink: `https://zkverify-testnet.subscan.io/tx/${aggregationData?.patientTxHash || '0x962179ba652c73397839c6dfa26ae77e6b4d9de6092cb56d83ba234fca4d6944'}`,
-                // Real aggregation data
-                doctorAggregationId: aggregationData?.doctorAggregationId || 62,
-                patientAggregationId: aggregationData?.patientAggregationId || 63,
-                doctorJobId: doctorResult?.jobId || aggregationData?.doctorJobId || 'a9256704-72cd-11f0-ace6-52e9cfc5c9c6',
-                patientJobId: patientResult?.jobId || aggregationData?.patientJobId || '0ccb1d96-72ce-11f0-ace6-52e9cfc5c9c6',
-                doctorTxHash: aggregationData?.doctorTxHash || '0x26f5bca2ccce81131eb30a5772fdc707c046c98ca88f34a2f042bb869d93bc25',
-                patientTxHash: aggregationData?.patientTxHash || '0x962179ba652c73397839c6dfa26ae77e6b4d9de6092cb56d83ba234fca4d6944',
+                // Real zkVerify testnet explorer links using actual tx hashes
+                doctorZkVerifyLink: doctorResult?.txHash ? `https://zkverify-testnet.subscan.io/tx/${doctorResult.txHash}` : null,
+                patientZkVerifyLink: patientResult?.txHash ? `https://zkverify-testnet.subscan.io/tx/${patientResult.txHash}` : null,
+                // Real aggregation data from verification results
+                doctorAggregationId: doctorResult?.aggregationId || 'N/A',
+                patientAggregationId: patientResult?.aggregationId || 'N/A',
+                doctorJobId: doctorResult?.jobId || 'N/A',
+                patientJobId: patientResult?.jobId || 'N/A',
+                doctorTxHash: doctorResult?.txHash || 'N/A',
+                patientTxHash: patientResult?.txHash || 'N/A',
                 zkVerifyEndpoint: 'https://zkverify-testnet.subscan.io',
                 totalProofsVerified: 2,
-                verificationMethod: 'zkVerify Testnet + Real Aggregation'
+                verificationMethod: 'zkVerify Testnet + Real-time Data'
               }
             }
           }
@@ -425,8 +418,7 @@ const InsuranceInterface = () => {
         
         await recordVerificationResult(claimIndex, 'success', {
           doctorResult,
-          patientResult,
-          aggregationData
+          patientResult
         });
         
       } else {

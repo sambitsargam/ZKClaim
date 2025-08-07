@@ -379,7 +379,9 @@ app.post('/api/verify-proofs-from-files', async (req, res) => {
         verified: doctorVerifyResponse.data.verified,
         jobId: doctorVerifyResponse.data.jobId,
         status: doctorVerifyResponse.data.status,
-        proofHash: doctorPublicSignals[0] // First public signal is the proof hash
+        proofHash: doctorPublicSignals[0], // First public signal is the proof hash
+        txHash: doctorVerifyResponse.data.txHash,
+        aggregationId: doctorVerifyResponse.data.aggregationId
       });
     } else {
       results.push({
@@ -430,7 +432,9 @@ app.post('/api/verify-proofs-from-files', async (req, res) => {
         verified: patientVerifyResponse.data.verified,
         jobId: patientVerifyResponse.data.jobId,
         status: patientVerifyResponse.data.status,
-        proofHash: patientPublicSignals[0] // First public signal is the proof hash
+        proofHash: patientPublicSignals[0], // First public signal is the proof hash
+        txHash: patientVerifyResponse.data.txHash,
+        aggregationId: patientVerifyResponse.data.aggregationId
       });
     } else {
       results.push({
