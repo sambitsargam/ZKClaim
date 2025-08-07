@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, Zap, Eye, CheckCircle, ArrowRight, Github, Twitter, Linkedin } from 'lucide-react';
-import { WagmiProvider } from 'wagmi';
+import { WagmiProvider, useChainId } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { config } from './config/web3';
 import ZKClaimApp from './components/ZKClaimApp';
@@ -8,9 +8,23 @@ import RoleSelector from './components/RoleSelector';
 import DoctorInterface from './components/DoctorInterface';
 import PatientInterface from './components/PatientInterface';
 import InsuranceInterface from './components/InsuranceInterface';
+import NetworkSwitcher from './components/NetworkSwitcher';
+import { SUPPORTED_CHAIN_IDS } from './config/contracts';
 import './App.css';
 
 const queryClient = new QueryClient();
+
+// Component to check network and render appropriate content
+function NetworkAwareContent({ children }) {
+  const chainId = useChainId();
+  const isNetworkSupported = SUPPORTED_CHAIN_IDS.includes(chainId);
+
+  if (!isNetworkSupported) {
+    return <NetworkSwitcher />;
+  }
+
+  return children;
+}
 
 function App() {
   const [isVisible, setIsVisible] = useState(false);
@@ -81,7 +95,9 @@ function App() {
                 </div>
               </div>
             </nav>
-            <RoleComponent />
+            <NetworkAwareContent>
+              <RoleComponent />
+            </NetworkAwareContent>
           </div>
         </QueryClientProvider>
       </WagmiProvider>
@@ -110,7 +126,9 @@ function App() {
                 </div>
               </div>
             </nav>
-            <RoleSelector onRoleSelect={handleRoleSelect} />
+            <NetworkAwareContent>
+              <RoleSelector onRoleSelect={handleRoleSelect} />
+            </NetworkAwareContent>
           </div>
         </QueryClientProvider>
       </WagmiProvider>
