@@ -234,10 +234,7 @@ npm run deploy:production
 
 ## 🌐 Supported Networks
 
-- **Ethereum Sepolia** (Testnet)
-- **Polygon Mumbai** (Testnet)  
-- **zkVerify Testnet** (ZK Verification)
-- **Hardhat Local** (Development)
+- **Horizen Testnet (Base Sepolia)** (Testnet)
 
 ## 📚 Documentation
 
